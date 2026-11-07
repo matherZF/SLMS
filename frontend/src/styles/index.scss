@@ -1,0 +1,91 @@
+// 全局 reset 与通用样式
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
+    Arial, "PingFang SC", "Microsoft YaHei", sans-serif;
+  background: #f4f7fb;
+  color: #1e293b;
+  -webkit-font-smoothing: antialiased;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+// 页面容器
+.page-container {
+  padding: 20px;
+  background: rgba(255,255,255,.94);
+  border: 1px solid rgba(148,163,184,.16);
+  border-radius: 14px;
+  box-shadow: 0 10px 30px rgba(15,35,64,.055);
+  min-height: calc(100vh - 100px);
+}
+
+// 页面标题
+.page-title {
+  font-size: 20px;
+  font-weight: 600;
+  margin: 0 0 16px;
+}
+
+// 过滤栏
+.filter-bar {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  align-items: center;
+  padding: 14px;
+  border-radius: 10px;
+  background: #f8fafc;
+  border: 1px solid #edf2f7;
+}
+
+.el-button{border-radius:8px;font-weight:500}
+.el-button--primary{--el-button-bg-color:#1677ff;--el-button-border-color:#1677ff;--el-button-hover-bg-color:#0ea5e9;--el-button-hover-border-color:#0ea5e9}
+.el-input__wrapper,.el-select__wrapper{border-radius:8px!important;box-shadow:0 0 0 1px #dce5ef inset!important}
+.el-input__wrapper.is-focus,.el-select__wrapper.is-focused{box-shadow:0 0 0 1px #38bdf8 inset,0 0 0 3px rgba(56,189,248,.1)!important}
+.el-table{--el-table-header-bg-color:#f5f8fc;--el-table-header-text-color:#475569;--el-table-row-hover-bg-color:#f0f9ff;border-radius:10px;overflow:hidden}
+.el-table th.el-table__cell{font-weight:650;height:46px}
+.el-dialog{border-radius:14px!important;box-shadow:0 24px 80px rgba(15,23,42,.22)!important;overflow:hidden}
+.el-card{border-color:rgba(148,163,184,.18)!important;border-radius:12px!important}
+.el-tag{border-radius:6px}
+
+// 移动端：大而宽的主操作按钮
+.primary-mobile-btn {
+  min-height: 44px !important;
+  font-size: 16px !important;
+  width: 100%;
+}
+
+// 详情页的信息行
+.info-row {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.info-row .label {
+  color: #909399;
+  min-width: 72px;
+}
+
+// 响应式：小于 768px 时调整
+@media (max-width: $md) {
+  .page-container {
+    padding: 12px;
+    border: 0;
+    border-radius: 0;
+    min-height: auto;
+    box-shadow: none;
+  }
+  .el-table {
+    font-size: 13px;
+  }
+  .page-title {
+    font-size: 18px;
+  }
+}

@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  控制台 + 文件双输出：CMD 窗口实时滚动，logs/sp-backend.log 按天滚动保留 30 天。
+  ⚠ 不要使用 %style(..)：logback-classic 未注册该转换词，启动时会直接抛
+    "There is no conversion class registered for composite conversion word [style]"。
+  保留天数可用环境变量 LOG_HISTORY 覆盖；文件目录取 logging.file.path（默认 logs）。
+-->
+<configuration>
+    <springProperty scope="context" name="LOG_PATH" source="logging.file.path" defaultValue="logs"/>
+    <property name="LOG_FILE" value="${LOG_PATH}/sp-backend.log"/>
+    <property name="LOG_HISTORY" value="${LOG_HISTORY:-30}"/>
+
+    <property name="LOG_PATTERN"
+              value="%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] %logger{36} - %msg%n%ex"/>
+
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <!-- 控制台不指定 charset：跟随系统默认（中文 Windows 是 GBK），
+             否则 UTF-8 字节输出到 cp936 的 cmd 会变成乱码。 -->
+        <encoder>
+            <pattern>${LOG_PATTERN}</pattern>
+        </encoder>
+    </appender>
+
+    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_FILE}</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_FILE}.%d{yyyy-MM-dd}.%i.gz</fileNamePattern>
+            <maxHistory>${LOG_HISTORY}</maxHistory>
+            <maxFileSize>50MB</maxFileSize>
+            <totalSizeCap>1GB</totalSizeCap>
+        </rollingPolicy>
+        <encoder>
+            <pattern>${LOG_PATTERN}</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+    </appender>
+
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="FILE"/>
+    </root>
+</configuration>

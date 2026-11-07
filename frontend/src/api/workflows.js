@@ -1,0 +1,1 @@
+import request from './request';export default{list:()=>request.get('/workflows'),candidates:()=>request.get('/workflows/candidates'),create:d=>request.post('/workflows',d),update:(id,d)=>request.put(`/workflows/${id}`,d)}

@@ -1,0 +1,31 @@
+{
+  "appId": "com.company.wms",
+  "appName": "备品备件管理",
+  "webDir": "dist",
+  "bundledWebRuntime": true,
+  "android": {
+    "backgroundColor": "#ffffff"
+  },
+  "server": {
+    "androidScheme": "http",
+    "allowNavigation": [
+      "10.156.191.23",
+      "10.157.111.213",
+      "localhost",
+      "127.0.0.1",
+      "10.*.*.*"
+    ]
+  },
+  "plugins": {
+    "SystemBars": {
+      "style": "DARK"
+    },
+    "BarcodeScanner": {
+      "cameraPermission": "WMS App 需要使用摄像头扫描二维码"
+    },
+    "LocalNotifications": {
+      "smallIcon": "ic_stat_alert",
+      "iconColor": "#1E54D8"
+    }
+  }
+}

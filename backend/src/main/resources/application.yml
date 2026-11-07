@@ -1,0 +1,215 @@
+server:
+  port: 8080
+
+spring:
+  datasource:
+    url: ${APP_DB_URL:jdbc:mysql://localhost:3306/spare_parts?createDatabaseIfNotExist=true&useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    username: ${APP_DB_USERNAME:root}
+    password: ${APP_DB_PASSWORD:root}
+  jpa:
+    hibernate:
+      ddl-auto: ${JPA_DDL_AUTO:validate}
+    show-sql: false
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: Asia/Shanghai
+        format_sql: true
+  datasource.hikari:
+    pool-name: WmsHikariPool
+    connection-timeout: 5000
+    validation-timeout: 3000
+    maximum-pool-size: 10
+  sql:
+    init:
+      mode: never
+  flyway:
+    enabled: ${FLYWAY_ENABLED:true}
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    baseline-version: 1
+    validate-on-migrate: true
+  jackson:
+    time-zone: Asia/Shanghai
+    date-format: yyyy-MM-dd HH:mm:ss
+    serialization:
+      write-dates-as-timestamps: false
+
+jwt:
+  # 必须通过环境变量 JWT_SECRET 提供至少 32 字节的随机密钥，未设置时启动失败。
+  secret: ${JWT_SECRET:}
+  expiration: 86400000  # 24小时毫秒
+
+app:
+  approval:
+    # 单个审批节点超过此时长后标记为超时待办；可通过 APPROVAL_TIMEOUT_HOURS 覆盖。
+    timeout-hours: ${APPROVAL_TIMEOUT_HOURS:24}
+  cors:
+    # Web 浏览器 + Capacitor APP（Android WebView Origin 是 http://localhost）
+    allowed-origin-patterns:
+      - http://localhost:*
+      - http://127.0.0.1:*
+      - http://10.*.*.*:*
+      - http://192.168.*.*:*
+      - capacitor://*
+      - file://*
+
+device:
+  datasource:
+    enabled: ${DEVICE_DB_ENABLED:false}
+    url: ${DEVICE_DB_URL:}
+    username: ${DEVICE_DB_USERNAME:}
+    password: ${DEVICE_DB_PASSWORD:}
+    driver-class-name: ${DEVICE_DB_DRIVER:com.mysql.cj.jdbc.Driver}
+    view-name: ${DEVICE_DB_VIEW:vw_sp_equipment_runtime}
+
+eslabel:
+  # 电子标签总开关：false 时退回桩实现，只打日志不发 HTTP（设备尚未启用时临时用）
+  enabled: ${ESL_ENABLED:true}
+  # 仓储13代电子标签（墨水屏）服务器配置
+  server-url: ${ESL_SERVER_URL:http://192.168.1.200}
+  light-path: ${ESL_LIGHT_PATH:/wms/associate/lightTagsLed}
+  light-moving-path: ${ESL_LIGHT_MOVING_PATH:/wms/associate/lightMovingTagsLed/v2}
+  query-device-info-path: ${ESL_QUERY_DEVICE_INFO_PATH:/wms/associate/deviceInfo}
+  connect-timeout-ms: ${ESL_CONNECT_TIMEOUT_MS:3000}
+  read-timeout-ms: ${ESL_READ_TIMEOUT_MS:5000}
+  # 回调鉴权：/api/esl/callback/** 是 permitAll（设备端带不了 JWT），
+  # 配置后回调必须带同名请求头且值一致，否则一律拒绝并写审计。
+  # 留空 = 不校验（兼容现场还没配的设备端），启动日志会持续告警；上线后应当配置。
+  callback-token: ${ESL_CALLBACK_TOKEN:}
+  callback-header: ${ESL_CALLBACK_HEADER:X-ESL-Token}
+
+ext-stat:
+  # 设备每日运行数据同步：每天定时从外部系统（DT/WCS/WMS）拉前一天数据，
+  # 落到本地表 wms_device_stat_daily。部署到与 WCS/WMS 同网段的服务器后把 enabled 打开并填 sources。
+  #
+  # 两种接入方式（同一个 sources 数组里可以混用）：
+  #  A. 源库建只读视图 vw_sp_device_stat_daily，列名 stat_date/device_type/device_code/running_hours/task_count/total_qty
+  #  B. 源库已有自己的汇总表（如 WMS 的 dws_device_daily_stat），直接在 query 里取别名，不建视图
+  # 两者的差别只在 query 与 date-param-format，SP 侧其余代码一条都不用改。
+  enabled: ${EXT_STAT_ENABLED:true}
+  # 默认 01:30 跑前一天：跑"当天"会漏掉深夜才完成的任务，且不自动补。
+  # 注意：必须晚于源库自己的跑批时间，否则拉到的是空数据（WMS 的 dws_device_daily_stat 建议确认其跑批在 01:00 前）。
+  cron: ${EXT_STAT_CRON:0 30 1 * * *}
+  zone: ${EXT_STAT_ZONE:Asia/Shanghai}
+  # 已接入的源。DT = 数字孪生系统 dt-system（视图 vw_sp_device_stat_daily，堆垛机 SC + 机械手 RB），
+  # 与 WMS 那张表共用同一套同步代码：每天 01:30 各拉各的"前一天"，入库 upsert。
+  sources:
+    - code: DT
+      enabled: ${EXT_STAT_DT_ENABLED:true}
+      peer: 数字孪生系统/dt_device_state
+      url: ${EXT_STAT_DT_URL:jdbc:mysql://10.156.191.33:3306/dt-system?useSSL=false&serverTimezone=Asia/Shanghai&characterEncoding=utf8&useCursorFetch=true}
+      username: ${EXT_STAT_DT_USERNAME:sp_stat_reader}
+      # 密码不设默认值：部署时必须通过 EXT_STAT_DT_PASSWORD 环境变量提供，避免明文密码随包分发。
+      password: ${EXT_STAT_DT_PASSWORD:}
+      driver-class-name: com.mysql.cj.jdbc.Driver
+      query-timeout-seconds: 60
+      # `date` 是 varchar(10) 存 'yyyyMMdd'，两个参数必须按同样格式传字符串，
+      # 否则 MySQL 不会把列隐式转成日期，条件恒不成立，表现为"同步成功但 0 条"。
+      date-param-format: yyyyMMdd
+      # 说明：
+      #  1) 不再直连 dt_device_state，改查 DT 侧视图 vw_sp_device_stat_daily：
+      #     DT 库里建了汇总表 dws_device_daily_stat + 每日 event 跑 sp_device_daily_stat 过程，
+      #     SP 只读视图。以后数据口径变了只改 DT 侧过程/视图，SP 零改动。
+      #  2) 视图列名对齐 SP 契约：stat_date(yyyyMMdd)/device_type/device_code/running_hours/task_count/total_qty。
+      #  3) 设备映射在 DT 侧过程里做：DDJ 001~012 → SC01~SC12；CMDJQR → RB01~RB08。
+      #     RB 的件数由 WMS（PIECE_QTY）与 WCS（piece_qty）供给，SP 侧展示/累计时跨源合计。
+      #  4) DT 侧 event 01:10 跑前一天，SP 的 01:30 拉取必须晚于它。
+      query: >
+        select device_type   as device_type,
+               device_code   as device_code,
+               running_hours as running_hours,
+               task_count    as task_count,
+               total_qty     as total_qty
+        from vw_sp_device_stat_daily
+        where stat_date >= ? and stat_date < ?
+          and device_code <> ''
+    # WMS：生产库（10.156.191.25/ldwl_wms）。源库侧已建视图 vw_sp_device_stat_daily
+    # （底部仍是 dws_device_daily_stat，口径改了只改视图/过程，SP 零改动），SP 只读视图。
+    # 测试库（10.156.191.24）已废弃，换库只改 EXT_STAT_WMS_URL 环境变量即可。
+    - code: WMS
+      enabled: ${EXT_STAT_WMS_ENABLED:true}
+      peer: WMS生产库 10.156.191.25/ldwl_wms
+      url: ${EXT_STAT_WMS_URL:jdbc:mysql://10.156.191.25:3306/ldwl_wms?useSSL=false&serverTimezone=Asia/Shanghai&characterEncoding=utf8&useCursorFetch=true}
+      username: ${EXT_STAT_WMS_USERNAME:sp_stat_reader}
+      # 密码不设默认值：部署时必须通过 EXT_STAT_WMS_PASSWORD 环境变量提供，避免明文密码随包分发。
+      password: "${EXT_STAT_WMS_PASSWORD:}"
+      driver-class-name: com.mysql.cj.jdbc.Driver
+      query-timeout-seconds: 60
+      # 视图里 stat_date 是 varchar(8) 存 'yyyyMMdd'，两个参数必须按同样格式传字符串，
+      # 否则条件恒不成立，表现为"同步成功但 0 条"（2026-10-30 实测踩过）。
+      date-param-format: yyyyMMdd
+      # 说明：
+      #  1) 视图列名已对齐 SP 契约：stat_date/device_type/device_code/running_hours/task_count/total_qty。
+      #  2) WMS 供任务数与件数（RB 为主），时长仍以 DT 为准；SUM_HOURS 恒 0 不影响合计。
+      #  3) device_code <> '' 必留：底层允许空设备号（线体级汇总），空号会污染跨源累加。
+      query: >
+        select device_type   as device_type,
+               device_code   as device_code,
+               running_hours as running_hours,
+               task_count    as task_count,
+               total_qty     as total_qty
+        from vw_sp_device_stat_daily
+        where stat_date >= ? and stat_date < ?
+          and device_code <> ''
+    # WCS：Oracle 11g（10.156.191.22:1521/orcl）。源库侧按 docs/wcs-device-stat-daily.sql
+    # 建汇总表 + 过程 + 定时任务 + 视图，SP 只查视图 VW_SP_DEVICE_STAT_DAILY，只读账号。
+    # 只取 AGV（AGV01~AGV40）：堆垛机 SC 的运行数据一律以数字孪生 DT 为准，
+    # 两个源都供时长会让备件寿命 HOURS 口径翻倍，所以 WCS 侧 SQL 已用 DEVICETYPE='AGV' 挡掉 SC。
+    # 驱动（ojdbc11 + orai18n）已在 pom 默认依赖里，IDE 直接 Run / mvn package 都自带，不需要额外 profile。
+    - code: WCS
+      enabled: ${EXT_STAT_WCS_ENABLED:true}
+      peer: ${EXT_STAT_WCS_PEER:WCS生产库 10.156.191.22/orcl}
+      url: ${EXT_STAT_WCS_URL:jdbc:oracle:thin:@//10.156.191.22:1521/orcl}
+      username: ${EXT_STAT_WCS_USERNAME:SP_STAT_READER}
+      # 密码不设默认值：部署时必须通过 EXT_STAT_WCS_PASSWORD 环境变量提供，避免明文密码随包分发。
+      password: "${EXT_STAT_WCS_PASSWORD:}"
+      driver-class-name: oracle.jdbc.OracleDriver
+      query-timeout-seconds: 60
+      # 源库 STAT_DATE 是 DATE 类型 → 这一项必须留空，按 java.sql.Date 传参。
+      # 只有 varchar 存 'yyyyMMdd' 的库才需要填格式；在这里填了格式反而会一条都拉不到。
+      # 列名是 SP 侧固定契约，顺序固定：device_type, device_code, running_hours, task_count, total_qty
+      # 必须带 whld_wcs. 前缀：SP 用的是只读账号 SP_STAT_READER，当前 schema 是它自己，
+      # 不加前缀会报 ORA-00942（表现为 bad SQL grammar）。授权是对象级，不改变默认 schema。
+      query: >
+        select device_type, device_code, running_hours, task_count, total_qty
+        from whld_wcs.vw_sp_device_stat_daily
+        where stat_date >= ? and stat_date < ?
+  
+
+spare-part:
+  usage-sync:
+    enabled: ${SPARE_USAGE_SYNC_ENABLED:true}
+    cron: ${SPARE_USAGE_SYNC_CRON:0 0 2 * * *}
+    zone: ${SPARE_USAGE_SYNC_ZONE:Asia/Shanghai}
+    # 件数（QTY）口径取数时只认哪一个来源系统（WCS/WMS）。
+    # 留空 = 按设备编号跨源累加；如果 WCS 和 WMS 存在同号设备就指定其中一个，避免混算。
+    piece-source: ${SPARE_USAGE_PIECE_SOURCE:}
+    # 预测「下次更换日」所需的最短快照跨度（天）。跨度不足时只显示已积累天数，不输出速率与日期，
+    # 避免短窗口里的停机/检修把日均消耗算歪。设为 1 表示只要有两天数据就预测。
+    forecast-min-days: ${SPARE_USAGE_FORECAST_MIN_DAYS:3}
+  # 备件需求预测：用设备产量 × 备件寿命推算「多久补一次货、一次补多少」。
+  # 只吃设备每日汇总表（wms_device_stat_daily），不依赖故障码/维修工单。
+  forecast:
+    # 用最近多少天的设备产量算日均。太短会被单日异常放大，太长跟不上产线调整。
+    production-window-days: ${SPARE_FORECAST_PRODUCTION_DAYS:7}
+    # 除采购周期外再多留几天的用量，保证到货前不见底。
+    safety-days: ${SPARE_FORECAST_SAFETY_DAYS:7}
+    # 备件没填采购周期时，按这个天数估算补货量（会在页面上标明是估算值）。
+    # 缺采购周期不等于不用补货——库存撑不过一周就必须给一个下限量，否则会算成「暂不用补」。
+    default-lead-days: ${SPARE_FORECAST_DEFAULT_LEAD_DAYS:7}
+  # 备件寿命预警提前天数：备件档案上该字段的默认值。
+  # 与下面 alert/forecast 各项一样，都可以在「系统管理 → 系统配置」里改，这里只是出厂默认值。
+  life:
+    warning-days: ${SPARE_LIFE_WARNING_DAYS:3}
+  # 备件预警：每天定时算一次并落表，页面与站内消息都读这张表。
+  alert:
+    # 批次到期前多少天提醒优先出库
+    expiry-ahead-days: ${SPARE_ALERT_EXPIRY_AHEAD_DAYS:30}
+    enabled: ${SPARE_ALERT_ENABLED:true}
+    # 排在设备数据同步（01:30）与台账刷新（02:00）之后，算的时候用的是当天最新的消耗进度。
+    # 若源库跑批晚于 01:30，这里算到的是前一天的数据，那是数据源的时间问题。
+    cron: ${SPARE_ALERT_CRON:0 0 9 * * *}
+    zone: ${SPARE_ALERT_ZONE:Asia/Shanghai}

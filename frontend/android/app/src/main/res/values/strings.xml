@@ -1,0 +1,10 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">备品备件管理</string>
+    <string name="title_activity_main">备品备件管理</string>
+    <string name="package_name">com.company.wms</string>
+    <string name="custom_url_scheme">com.company.wms</string>
+    <!-- 让 WebView origin 从 https://localhost 变成 http://localhost -->
+    <!-- 避免 Mixed Content 拦截 HTTP 后端请求 -->
+    <string name="capacitor_android_scheme">http</string>
+</resources>

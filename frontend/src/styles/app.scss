@@ -1,0 +1,113 @@
+// App 端（Android APP + 手机浏览器）全局样式
+// 根选择器统一为 body.app-shell（由 App.vue 负责挂类），页面内不要再写 .app-shell 私有样式
+
+body.app-shell {
+  // ---------- 弹窗：统一降级为底部动作面板 ----------
+  .el-overlay-dialog {
+    display: flex;
+    align-items: flex-end;
+    padding: 0;
+  }
+  .el-overlay-dialog .el-dialog {
+    width: 100% !important;
+    max-width: 100%;
+    margin: 0 !important;
+    max-height: 88vh;
+    display: flex;
+    flex-direction: column;
+    border-radius: 18px 18px 0 0 !important;
+  }
+  .el-overlay-dialog .el-dialog__header {
+    padding: 16px 16px 8px;
+  }
+  .el-overlay-dialog .el-dialog__body {
+    overflow-y: auto;
+    padding: 8px 16px;
+  }
+  .el-overlay-dialog .el-dialog__footer {
+    padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
+  }
+
+  // MessageBox 同样底部化
+  .el-overlay-message-box {
+    display: flex;
+    align-items: flex-end;
+    padding: 0;
+  }
+  .el-message-box {
+    width: 100%;
+    max-width: 100%;
+    margin: 0;
+    padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+    border-radius: 18px 18px 0 0;
+  }
+
+  // 抽屉：占满宽度并避让底部安全区
+  .el-drawer__body {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  // ---------- 触控尺寸：主操作区按钮高度 ≥ 44px ----------
+  .el-dialog__footer .el-button,
+  .el-message-box__btns .el-button,
+  .filter-bar .el-button,
+  .primary-mobile-btn {
+    min-height: 44px;
+    font-size: 15px;
+  }
+  .el-input__wrapper,
+  .el-select__wrapper {
+    min-height: 42px;
+  }
+
+  // ---------- 内容区：去掉桌面卡片外框，贴合窄屏 ----------
+  .page-container {
+    padding: 12px;
+    border: 0;
+    border-radius: 0;
+    min-height: auto;
+    box-shadow: none;
+  }
+  .page-title {
+    font-size: 18px;
+  }
+  .el-table {
+    font-size: 13px;
+  }
+
+  // ---------- 提示信息避让状态栏 ----------
+  .el-message {
+    top: calc(env(safe-area-inset-top, 0px) + 16px);
+  }
+
+  // ---------- 通用列表页适配（系统管理等未深度定制的页面） ----------
+  .page-container {
+    background: transparent;
+  }
+  .filter-bar {
+    flex-wrap: wrap;
+    padding: 12px;
+    background: #fff;
+    border-radius: 14px;
+    box-shadow: 0 2px 10px rgba(30, 60, 120, .05);
+    border: 0;
+    gap: 10px;
+    .el-input,
+    .el-select,
+    .el-date-editor {
+      width: 100% !important;
+    }
+    .el-button {
+      flex: 1;
+      margin-left: 0;
+      min-height: 40px;
+    }
+  }
+  .el-pagination {
+    justify-content: center;
+  }
+  // 表格内边距收紧，配合横向滚动
+  .el-table {
+    border-radius: 12px;
+  }
+}

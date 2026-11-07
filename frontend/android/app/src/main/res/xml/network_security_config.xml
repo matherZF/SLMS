@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  允许 APP 发起明文 HTTP（http://）请求
+  Android 9+ 默认禁止明文流量，usesCleartextTraffic="true" + 本文件双保险
+  内网开发环境：放通所有 IP 的明文请求
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="user" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>
