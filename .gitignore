@@ -18,7 +18,21 @@ backup/
 *.apk
 
 # 部署产物与含密钥脚本（仅服务器本地保留，不入库）
+# deploy\run-sp-backend.bat 含 JWT 密钥、生产库密码、三个外部源密码；
+# deploy\sql\init-24.sql 含 sp_app 建号明文密码 —— 整套一律不入库
 deploy/
+
+# 部署升级包与解压后的临时目录（含 jar 副本）
+sp-*.zip
+sp-upgrade-*/
+
+# 运行期产物
+*.log
+*.bak
+*.bak-*
+
+# 编辑器配置（非源码）
+.vscode/
 
 # 交付文档（docx，不入代码库）
 MD/
