@@ -34,4 +34,14 @@ public interface InventoryRepository extends JpaRepository<Inventory, Long> {
     @EntityGraph(attributePaths = {"product", "location", "batch"})
     @Query("select i from Inventory i where i.id = :id")
     Optional<Inventory> findWithGraphForUpdate(@Param("id") Long id);
+
+    /** 按商品+库位+批次加悲观锁，供移库等并发写场景使用 */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select i from Inventory i where i.product.id = :productId and i.location.id = :locationId and i.batch.id = :batchId")
+    Optional<Inventory> findByProductIdAndLocationIdAndBatchIdForUpdate(@Param("productId") Long productId, @Param("locationId") Long locationId, @Param("batchId") Long batchId);
+
+    /** 按商品+库位（无批次）加悲观锁，供移库等并发写场景使用 */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select i from Inventory i where i.product.id = :productId and i.location.id = :locationId and i.batch is null")
+    Optional<Inventory> findByProductIdAndLocationIdAndBatchIsNullForUpdate(@Param("productId") Long productId, @Param("locationId") Long locationId);
 }

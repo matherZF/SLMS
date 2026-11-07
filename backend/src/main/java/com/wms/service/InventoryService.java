@@ -192,8 +192,8 @@ public class InventoryService {
 
         Batch batch = source.getBatch();
         Optional<Inventory> existingTarget = batch == null
-                ? inventoryRepo.findByProductIdAndLocationIdAndBatchIsNull(source.getProduct().getId(), targetLocation.getId())
-                : inventoryRepo.findByProductIdAndLocationIdAndBatchId(source.getProduct().getId(), targetLocation.getId(), batch.getId());
+                ? inventoryRepo.findByProductIdAndLocationIdAndBatchIsNullForUpdate(source.getProduct().getId(), targetLocation.getId())
+                : inventoryRepo.findByProductIdAndLocationIdAndBatchIdForUpdate(source.getProduct().getId(), targetLocation.getId(), batch.getId());
         Inventory target = existingTarget.orElseGet(() ->
                 new Inventory(source.getProduct(), targetLocation, batch, 0, java.time.Instant.now()));
         int sourceBefore = source.getQty();
