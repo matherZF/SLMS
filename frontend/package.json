@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0 --port 5173",
     "build": "vite build",
-    "build:web": "vite build --mode web",
+    "build:web": "vite build --mode web --outDir dist-web",
     "preview": "vite preview --port 4173"
   },
   "dependencies": {

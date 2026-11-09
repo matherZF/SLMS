@@ -23,10 +23,12 @@
 
     <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
         <file>${LOG_FILE}</file>
-        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
-            <fileNamePattern>${LOG_FILE}.%d{yyyy-MM-dd}.%i.gz</fileNamePattern>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <!-- 纯按天滚动：跨天后的第一条日志会把 sp-backend.log 改名为
+                 sp-backend.yyyy-MM-dd.log（明文，不压缩），当天继续写 sp-backend.log。
+                 日志量小（每天几十 KB），不按大小切分，一天就一个文件。 -->
+            <fileNamePattern>${LOG_PATH}/sp-backend.%d{yyyy-MM-dd}.log</fileNamePattern>
             <maxHistory>${LOG_HISTORY}</maxHistory>
-            <maxFileSize>50MB</maxFileSize>
             <totalSizeCap>1GB</totalSizeCap>
         </rollingPolicy>
         <encoder>
