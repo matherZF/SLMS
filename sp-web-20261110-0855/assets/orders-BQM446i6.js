@@ -1,1 +1,0 @@
-import{r as e}from"./index-D0G8da_f.js";function n(r){return e.get("/orders",{params:r})}function o(){return e.get("/orders/pending")}function s(r){return e.get(`/orders/${r}`)}function i(r){return e.post("/orders",r)}export{i as c,s as d,n as l,o as p};

@@ -1,1 +1,0 @@
-import{r as s}from"./index-D0G8da_f.js";const t={list:()=>s.get("/roles"),permissions:()=>s.get("/roles/permissions"),create:e=>s.post("/roles",e),update:(e,r)=>s.put(`/roles/${e}`,r),remove:e=>s.delete(`/roles/${e}`)};export{t as a};
