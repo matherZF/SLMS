@@ -6,7 +6,7 @@
     <template v-if="isMobile">
       <div class="card-m m-filter">
         <el-input v-model="filters.sku" placeholder="SKU" clearable @keyup.enter="loadData" />
-        <el-input v-model="filters.name" placeholder="商品名称" clearable @keyup.enter="loadData" />
+        <el-input v-model="filters.name" placeholder="货品名称" clearable @keyup.enter="loadData" />
         <div class="m-btns">
           <el-button type="primary" class="m-primary-btn" @click="loadData">
             <el-icon><Search /></el-icon>&nbsp;查询
@@ -75,7 +75,7 @@
       />
       <el-input
         v-model="filters.name"
-        placeholder="商品名称"
+        placeholder="货品名称"
         clearable
         style="width: 200px"
         @keyup.enter="loadData"
@@ -100,7 +100,7 @@
       style="width: 100%"
     >
       <el-table-column prop="sku" label="SKU编码" min-width="140" />
-      <el-table-column prop="name" label="商品名称" min-width="180" />
+      <el-table-column prop="name" label="货品名称" min-width="180" />
       <el-table-column prop="category" label="分类" min-width="110"><template #default="{row}">{{row.category||'-'}}</template></el-table-column>
       <el-table-column label="品牌/型号" min-width="150"><template #default="{row}">{{[row.brand,row.model].filter(Boolean).join(' / ')||'-'}}</template></el-table-column>
       <el-table-column prop="spec" label="规格" min-width="120" />
@@ -215,7 +215,7 @@ function criticalityTone(value) { return { LOW: 't-gray', NORMAL: 't-blue', HIGH
 async function handleDelete(row) {
   try {
     await ElMessageBox.confirm(
-      `确定删除商品 ${row.name}（SKU: ${row.sku}）？若该商品已被入库单引用将无法删除。`,
+      `确定删除货品 ${row.name}（SKU: ${row.sku}）？若该货品已被入库单引用将无法删除。`,
       '删除确认',
       {
         type: 'warning',
@@ -227,7 +227,7 @@ async function handleDelete(row) {
     return
   }
   await productsApi.remove(row.id)
-  ElMessage.success('删除商品成功')
+  ElMessage.success('删除货品成功')
   // 删除后若当前页空了，回退一页
   if (list.value.length === 1 && page.page > 1) {
     page.page -= 1

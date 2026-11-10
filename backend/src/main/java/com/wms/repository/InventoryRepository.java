@@ -14,7 +14,7 @@ import java.util.Optional;
 public interface InventoryRepository extends JpaRepository<Inventory, Long> {
     Optional<Inventory> findByProductIdAndLocationId(Long productId, Long locationId);
 
-    /** 按商品+库位+批次精确查找库存记录 */
+    /** 按货品+库位+批次精确查找库存记录 */
     Optional<Inventory> findByProductIdAndLocationIdAndBatchId(Long productId, Long locationId, Long batchId);
 
     List<Inventory> findAllByProductId(Long productId);
@@ -35,12 +35,12 @@ public interface InventoryRepository extends JpaRepository<Inventory, Long> {
     @Query("select i from Inventory i where i.id = :id")
     Optional<Inventory> findWithGraphForUpdate(@Param("id") Long id);
 
-    /** 按商品+库位+批次加悲观锁，供移库等并发写场景使用 */
+    /** 按货品+库位+批次加悲观锁，供移库等并发写场景使用 */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select i from Inventory i where i.product.id = :productId and i.location.id = :locationId and i.batch.id = :batchId")
     Optional<Inventory> findByProductIdAndLocationIdAndBatchIdForUpdate(@Param("productId") Long productId, @Param("locationId") Long locationId, @Param("batchId") Long batchId);
 
-    /** 按商品+库位（无批次）加悲观锁，供移库等并发写场景使用 */
+    /** 按货品+库位（无批次）加悲观锁，供移库等并发写场景使用 */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select i from Inventory i where i.product.id = :productId and i.location.id = :locationId and i.batch is null")
     Optional<Inventory> findByProductIdAndLocationIdAndBatchIsNullForUpdate(@Param("productId") Long productId, @Param("locationId") Long locationId);

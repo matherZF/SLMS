@@ -2,7 +2,7 @@
   <div class="page-container">
     <PageHeader>
       设备管理
-      <template #desc>设备档案与运行数据；支持按区域折叠查看，运行数据可手动补拉</template>
+      <template #desc>设备档案与运行数据；支持按区域折叠查看，双击设备行可打开详情</template>
       <template #actions>
         <el-button :loading="sync.loading" @click="openSync">
           <el-icon><Refresh /></el-icon>&nbsp;补拉设备数据
@@ -31,7 +31,7 @@
       <el-table-column type="expand" width="46">
         <template #default="{ row }">
           <div class="zone-detail">
-            <el-table :data="row.devices" border size="small">
+            <el-table :data="row.devices" border size="small" class="device-table" @row-dblclick="(d) => openStats(d)">
               <el-table-column prop="code" label="设备编码" width="120" />
               <el-table-column prop="name" label="设备名称" min-width="130" />
               <el-table-column prop="model" label="型号" width="110" />
@@ -92,6 +92,39 @@
               </el-form-item>
               <el-form-item label="制造商" class="full"><el-input v-model="form.manufacturer" maxlength="128" /></el-form-item>
               <el-form-item label="备注" class="full"><el-input v-model="form.remark" type="textarea" :rows="3" maxlength="255" show-word-limit /></el-form-item>
+            </div>
+          </el-tab-pane>
+
+          <el-tab-pane name="mapping">
+            <template #label>
+              配置映射<span v-if="form.id" class="tab-badge">{{ (form.extRefs || []).length }}</span>
+            </template>
+            <div class="mapping-pane">
+              <div class="mapping-toolbar">
+                <span class="parts-hint">这台设备从哪些数据源取运行数据；每行勾选要取的指标，同一指标配了多行会合计</span>
+                <el-button v-if="auth.can('master:edit')" type="primary" size="small" @click="addRule">+ 增加映射</el-button>
+              </div>
+              <div class="ext-ref-editor">
+                <div v-for="(r, i) in form.extRefs" :key="i" class="ext-ref-row">
+                  <span class="ext-ref-idx">{{ i + 1 }}</span>
+                  <el-select v-model="r.sourceSys" style="width:96px">
+                    <el-option v-for="s in extSources" :key="s" :value="s" :label="s" />
+                  </el-select>
+                  <el-input v-model="r.extCode" placeholder="外部编码，如 STA002" maxlength="64" style="width:180px" />
+                  <el-checkbox v-model="r.takeHours">时长</el-checkbox>
+                  <el-checkbox v-model="r.takeTasks">任务数</el-checkbox>
+                  <el-checkbox v-model="r.takeQty">件数</el-checkbox>
+                  <el-button link type="danger" @click="removeRule(i)">删除</el-button>
+                </div>
+                <el-empty v-if="!(form.extRefs || []).length" description="未配置映射——这台设备将不取任何运行数据" :image-size="80">
+                  <el-button type="primary" size="small" @click="addRule">+ 增加映射</el-button>
+                </el-empty>
+                <div class="ext-ref-hint">
+                  每行 = 某个数据源里的一台设备（选 DT / WMS / WCS，再填它在那套系统里的编码）；
+                  勾选要从它取哪几项数据（可多选），同一指标配了多行会合计。<br>
+                  <b>不配置则这台设备不取任何运行数据</b>。双向托盘线把另一端站台也加一行即可，运行数据自动按两端口径合计。
+                </div>
+              </div>
             </div>
           </el-tab-pane>
 
@@ -164,9 +197,15 @@
           <el-descriptions-item label="设备编码">{{ statDevice.code }}</el-descriptions-item>
           <el-descriptions-item label="型号">{{ statDevice.model || '-' }}</el-descriptions-item>
           <el-descriptions-item label="设备名称">{{ statDevice.name }}</el-descriptions-item>
-          <el-descriptions-item label="区域">{{ statDevice.zone || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="区域">{{ zoneLabel(statDevice.zone) || '-' }}</el-descriptions-item>
           <el-descriptions-item label="安装位置">{{ statDevice.location || '-' }}</el-descriptions-item>
           <el-descriptions-item label="状态">{{ statusLabel(statDevice.status) }}</el-descriptions-item>
+          <el-descriptions-item label="取数映射" :span="2">
+            <template v-if="(statDevice.extRules || []).length">
+              <div v-for="(r, i) in statDevice.extRules" :key="i">{{ r.sourceSys }}/{{ r.extCode }}（{{ metricLabel(r) }}）</div>
+            </template>
+            <span v-else>未配置（不取运行数据）</span>
+          </el-descriptions-item>
           <el-descriptions-item label="制造商" :span="2">{{ statDevice.manufacturer || '-' }}</el-descriptions-item>
         </el-descriptions>
         <div class="eq-stat-bar">
@@ -183,12 +222,23 @@
           <div class="eq-stat-card"><span>件数</span><b>{{ totals.qty }}</b></div>
         </div>
         <el-table :data="statRows" size="small" border max-height="380" empty-text="暂无运行数据">
-          <el-table-column prop="statDate" label="日期" width="112" />
-          <el-table-column prop="sourceSys" label="来源" width="100" />
-          <el-table-column prop="deviceType" label="类型" width="70" />
-          <el-table-column label="时长(h)" width="90" align="right"><template #default="{row}">{{ row.runningHours ?? '-' }}</template></el-table-column>
-          <el-table-column label="任务数" width="86" align="right"><template #default="{row}">{{ row.taskCount ?? '-' }}</template></el-table-column>
-          <el-table-column label="件数" align="right"><template #default="{row}">{{ row.totalQty ?? '-' }}</template></el-table-column>
+          <el-table-column prop="statDate" label="日期" width="98" />
+          <el-table-column prop="sourceSys" label="来源" width="64" />
+          <el-table-column prop="deviceType" label="类型" width="58" />
+          <el-table-column label="时长(h)" width="74" align="right"><template #default="{row}">{{ row.runningHours ?? '-' }}</template></el-table-column>
+          <el-table-column label="任务数" width="74" align="right"><template #default="{row}">{{ row.taskCount ?? '-' }}</template></el-table-column>
+          <el-table-column label="件数" min-width="70" align="right"><template #default="{row}">{{ row.totalQty ?? '-' }}</template></el-table-column>
+        </el-table>
+        <div class="eq-stat-bar">
+          <span class="eq-stat-title">关联备件</span>
+        </div>
+        <el-table v-loading="statPartsLoading" :data="statParts" size="small" border max-height="220" empty-text="尚未关联备件">
+          <el-table-column prop="sku" label="SKU" width="110" />
+          <el-table-column prop="productName" label="备件" min-width="140" show-overflow-tooltip />
+          <el-table-column prop="installedQty" label="单机数量" width="80" align="center" />
+          <el-table-column prop="changeCycleDays" label="更换周期(天)" width="106" align="center">
+            <template #default="{ row }">{{ row.changeCycleDays ?? '-' }}</template>
+          </el-table-column>
         </el-table>
         <p class="eq-stat-tip">数据来自外部系统（数字孪生 / WMS / WCS）每日同步。整表为空通常是该设备编码在源系统没匹配到，或源库当天还没跑批。</p>
       </div>
@@ -312,23 +362,79 @@ async function load() {
 }
 
 /* ---------- 按区域分组（外层一行 = 一个区域） ---------- */
+// 区域在库里存的是字典编码（EQUIPMENT_ZONE 的 itemCode），历史数据也可能直接存了中文名；
+// 展示一律翻译成字典名称，查不到映射的原样显示，避免把 SC-1 这类编码直接亮给用户。
+function zoneLabel(v) {
+  if (!v) return ''
+  const hit = zoneOptions.value.find(x => x.itemCode === v)
+  return hit ? hit.itemLabel : v
+}
+
 const zoneGroups = computed(() => {
   const map = new Map()
   for (const r of rows.value) {
-    const z = r.zone || '未分区'
+    const z = zoneLabel(r.zone) || '未分区'
     if (!map.has(z)) map.set(z, { zone: z, devices: [] })
     map.get(z).devices.push(r)
   }
-  return [...map.values()].map(g => ({
-    ...g,
-    count: g.devices.length,
-    running: g.devices.filter(d => d.status === 'RUNNING').length,
-    models: [...new Set(g.devices.map(d => d.model).filter(Boolean))].join('、')
-  }))
+  // 区域按数据字典 EQUIPMENT_ZONE 的 sort_order 排（字典里没有的区域/未分区垫底）；
+  // 区域内设备按编码排（numeric 让 STA2 排在 STA10 前面）
+  const sortOrderOf = (z) => {
+    const hit = zoneOptions.value.find(x => (x.itemLabel || x.itemCode) === z)
+    return hit ? (hit.sortOrder ?? Number.MAX_SAFE_INTEGER) : Number.MAX_SAFE_INTEGER
+  }
+  const byCode = (a, b) => String(a.code || '').localeCompare(String(b.code || ''), 'zh-Hans-CN', { numeric: true })
+  return [...map.values()]
+    .map(g => {
+      const devices = g.devices.slice().sort(byCode)
+      return {
+        ...g,
+        devices,
+        count: devices.length,
+        running: devices.filter(d => d.status === 'RUNNING').length,
+        models: [...new Set(devices.map(d => d.model).filter(Boolean))].join('、')
+      }
+    })
+    .sort((a, b) => sortOrderOf(a.zone) - sortOrderOf(b.zone) || a.zone.localeCompare(b.zone, 'zh-Hans-CN'))
 })
 
 // 区域候选来自数据字典 EQUIPMENT_ZONE（系统管理 → 数据字典 里增删改，这里自动跟着变）
 const zoneOptions = ref([])
+
+async function loadZoneDict() {
+  if (!zoneOptions.value.length) zoneOptions.value = await dictApi.options('EQUIPMENT_ZONE')
+}
+
+/* ---------- 取数映射（源 + 外部编码 + 要取的指标） ---------- */
+// 取数只认配置：配了几行就按几行取，同一指标多行命中时合计；没配则该设备不取运行数据。
+// 每行必须至少勾一个指标，保存前在前端先拦一道，后端也有同样的校验。
+const extSources = ['WCS', 'WMS', 'DT']
+function emptyRule() { return { sourceSys: 'WCS', extCode: '', takeHours: true, takeTasks: true, takeQty: true } }
+function addRule() { form.value.extRefs = [...(form.value.extRefs || []), emptyRule()] }
+function removeRule(i) { form.value.extRefs = (form.value.extRefs || []).filter((_, x) => x !== i) }
+function metricLabel(r) {
+  const m = []
+  if (r.takeHours) m.push('时长')
+  if (r.takeTasks) m.push('任务数')
+  if (r.takeQty) m.push('件数')
+  return m.join('、') || '无'
+}
+
+/** 保存前的规则校验：编码必填、每行至少一个指标、同源同编码不能重复 */
+function validateRules() {
+  const seen = new Set()
+  for (const r of form.value.extRefs || []) {
+    const code = String(r.extCode || '').trim()
+    if (!code) { ElMessage.warning('取数映射里有未填编码的行，请填写或删除'); return false }
+    if (!r.takeHours && !r.takeTasks && !r.takeQty) {
+      ElMessage.warning(`映射 ${r.sourceSys}/${code} 至少要勾选一个指标`); return false
+    }
+    const key = r.sourceSys + '|' + code.toUpperCase()
+    if (seen.has(key)) { ElMessage.warning(`映射 ${r.sourceSys}/${code} 重复了`); return false }
+    seen.add(key)
+  }
+  return true
+}
 
 function onExpandChange(row, expandedList) {
   expandedZones.value = expandedList.map(r => r.zone)
@@ -345,16 +451,36 @@ function statusLabel(v) {
 
 /* ---------- 设备档案 CRUD / 关联备件 ---------- */
 async function open(r) {
-  form.value = r ? { ...r } : { status: 'RUNNING' }
+  form.value = r
+    ? {
+        ...r,
+        // 规则行带出时补齐指标开关（老数据没有这三个字段按"全取"处理）
+        extRefs: (r.extRefs || []).map(x => ({
+          sourceSys: x.sourceSys || 'WCS',
+          extCode: x.extCode || '',
+          takeHours: x.takeHours !== false,
+          takeTasks: x.takeTasks !== false,
+          takeQty: x.takeQty !== false
+        }))
+      }
+    : { status: 'RUNNING', extRefs: [] }
   formTab.value = 'basic'
   if (!statusOptions.value.length) statusOptions.value = await dictApi.options('EQUIPMENT_STATUS')
-  if (!zoneOptions.value.length) zoneOptions.value = await dictApi.options('EQUIPMENT_ZONE')
-  if (form.value.id) { partsPage.page = 1; loadParts() }   // 编辑时在「关联备件」页签展示
+  await loadZoneDict()
+  if (form.value.id) {
+    // 历史数据可能直接存了中文名，编辑时尽量还原成字典编码，保存后逐步统一
+    if (form.value.zone) {
+      const inv = zoneOptions.value.find(x => x.itemLabel === form.value.zone)
+      if (inv) form.value.zone = inv.itemCode
+    }
+    partsPage.page = 1; loadParts()   // 编辑时在「关联备件」页签展示
+  }
   visible.value = true
 }
 
 async function save() {
   try { await formRef.value.validate() } catch { return }
+  if (!validateRules()) return
   submitting.value = true
   try {
     form.value.id ? await api.update(form.value.id, form.value) : await api.create(form.value)
@@ -401,13 +527,28 @@ async function unbind(row) {
 const { isMobile } = useMobile()
 const statsVisible = ref(false), statsLoading = ref(false), statDevice = ref(null), statDays = ref(30), statRows = ref([])
 const totals = ref({ hours: 0, tasks: 0, qty: 0 })
+const statParts = ref([]), statPartsLoading = ref(false)
 const statTitle = computed(() => statDevice.value ? `${statDevice.value.code} · ${statDevice.value.name}` : '设备运行数据')
 
 async function openStats(row) {
   statDevice.value = row
   statDays.value = 30
   statsVisible.value = true
+  statParts.value = []
+  loadStatParts()
   await loadStats()
+}
+
+// 详情抽屉底部：这台设备关联的备件（不分页，一屏展示）
+async function loadStatParts() {
+  if (!statDevice.value?.id) return
+  statPartsLoading.value = true
+  try {
+    const r = await api.partsPage(statDevice.value.id, { page: 0, size: 200 })
+    statParts.value = r?.content || []
+  } finally {
+    statPartsLoading.value = false
+  }
 }
 
 async function loadStats() {
@@ -417,6 +558,9 @@ async function loadStats() {
     const r = await api.stats(statDevice.value.id, statDays.value)
     statRows.value = r?.rows || []
     totals.value = r?.totals || { hours: 0, tasks: 0, qty: 0 }
+    // /stats 响应里带按映射规则解析好的 extRules；列表行只有 extRefs（编辑用），
+    // 不合并的话抽屉永远显示"未配置"
+    statDevice.value = { ...statDevice.value, extRules: r?.extRules || [] }
   } finally {
     statsLoading.value = false
   }
@@ -473,7 +617,7 @@ async function submitSync() {
   }
 }
 
-onMounted(load)
+onMounted(() => { load(); loadZoneDict() })
 </script>
 
 <style scoped lang="scss">
@@ -485,6 +629,16 @@ onMounted(load)
   background: #eaf1ff; color: #1e54d8; font-size: 11px; line-height: 16px;
 }
 .parts-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+.mapping-pane { padding: 4px 2px; }
+.mapping-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.ext-ref-editor { width: 100%; padding: 12px 14px; background: #f8fafc; border: 1px solid #e4e9f2; border-radius: 6px; }
+.ext-ref-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 6px 0; border-bottom: 1px dashed #e8edf4; }
+.ext-ref-row:last-of-type { border-bottom: none; }
+.ext-ref-idx {
+  width: 20px; height: 20px; border-radius: 50%; background: #eaf1ff; color: #1e54d8;
+  font-size: 12px; line-height: 20px; text-align: center; flex-shrink: 0;
+}
+.ext-ref-hint { margin-top: 10px; font-size: 12px; line-height: 1.7; color: #909399; }
 .parts-hint { font-size: 12px; color: #94a3b8; line-height: 1.5; }
 .parts-pager { display: flex; justify-content: flex-end; margin-top: 10px; }
 @media (max-width: 767px) {
@@ -496,6 +650,8 @@ onMounted(load)
 .zone-detail {
   padding: 6px 12px 10px 40px;
   background: #fafcff;
+  // 双击行 = 打开设备详情，给个手型提示
+  .device-table :deep(.el-table__row) { cursor: pointer; }
 }
 .zone-running { color: #22a35d; font-weight: 700; }
 .zone-sep { color: #cbd5e1; margin: 0 4px; }

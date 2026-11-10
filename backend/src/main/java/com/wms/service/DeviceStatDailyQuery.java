@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -41,29 +42,42 @@ public class DeviceStatDailyQuery {
     }
 
     /**
-     * 跨源合计版：同一台设备（stat_date + device_type + device_code 相同）在 DT/WMS/WCS
-     * 各存一行（本地表唯一键含 source_sys），RB 等设备的时长/任务数/件数分散在多个源里，
-     * 展示时按日合并求和；sourceSys 拼成「DT+WMS」标明数据来自哪些源。按统计日倒序返回。
+     * 按设备的映射规则合并运行数据（设备详情页用）。
+     *
+     * <p>规则来自 {@link DeviceCodeResolver#rules(String)}——<b>没有默认</b>，没配映射就返回空。
+     * 只取规则命中的（源 + 编码）行，并且只累加该行勾选的指标：没勾的按 0 处理，
+     * 避免"两个源都供件数"时口径翻倍。同一天同一设备类型的多行（多编码/多源）合并成一行，
+     * sourceSys 拼「DT+WMS」、deviceCode 拼「STA001+STA002」标明数据由哪些编码合计而来。
+     * 按统计日倒序返回。</p>
      */
-    public List<DeviceStatDailyVO> listMerged(String deviceCode, LocalDate from, LocalDate to) {
-        List<DeviceStatDaily> rows = repo.findByStatDateBetween(from, to);
+    public List<DeviceStatDailyVO> listMergedByRules(List<DeviceCodeResolver.MappingRule> rules,
+                                                     LocalDate from, LocalDate to) {
+        if (rules == null || rules.isEmpty()) return List.of();
+        Map<String, DeviceCodeResolver.MappingRule> byKey = new HashMap<>();
+        List<String> codes = new ArrayList<>();
+        for (DeviceCodeResolver.MappingRule rule : rules) {
+            byKey.put(rule.matchKey(), rule);
+            if (!codes.contains(rule.extCode())) codes.add(rule.extCode());
+        }
+        String codeLabel = String.join("+", codes);
+        List<DeviceStatDaily> rows = repo.findByStatDateBetweenAndDeviceCodeIn(from, to, codes);
         Map<String, DeviceStatDailyVO> merged = new LinkedHashMap<>();
         for (DeviceStatDaily r : rows) {
-            if (deviceCode != null && !deviceCode.equalsIgnoreCase(r.getDeviceCode())) continue;
-            String key = r.getStatDate() + "|" + r.getDeviceType() + "|" + r.getDeviceCode();
+            DeviceCodeResolver.MappingRule rule = byKey.get(
+                    DeviceCodeResolver.normalizeKey(r.getSourceSys(), r.getDeviceCode()));
+            if (rule == null) continue;   // 编码对上了但源不在规则里：不取
+            BigDecimal hours = rule.takeHours() ? nz(r.getRunningHours()) : BigDecimal.ZERO;
+            long tasks = rule.takeTasks() ? nz(r.getTaskCount()) : 0L;
+            long qty = rule.takeQty() ? nz(r.getTotalQty()) : 0L;
+            String key = r.getStatDate() + "|" + r.getDeviceType();
             DeviceStatDailyVO prev = merged.get(key);
             if (prev == null) {
-                merged.put(key, toVO(r));
+                merged.put(key, new DeviceStatDailyVO(r.getId(), r.getStatDate(), r.getSourceSys(),
+                        r.getDeviceType(), codeLabel, hours, tasks, qty));
             } else {
-                merged.put(key, new DeviceStatDailyVO(
-                        prev.id(),
-                        prev.statDate(),
-                        mergeSource(prev.sourceSys(), r.getSourceSys()),
-                        prev.deviceType(),
-                        prev.deviceCode(),
-                        nz(prev.runningHours()).add(nz(r.getRunningHours())),
-                        prev.taskCount() + nz(r.getTaskCount()),
-                        prev.totalQty() + nz(r.getTotalQty())));
+                merged.put(key, new DeviceStatDailyVO(prev.id(), prev.statDate(),
+                        mergeSource(prev.sourceSys(), r.getSourceSys()), prev.deviceType(), prev.deviceCode(),
+                        nz(prev.runningHours()).add(hours), prev.taskCount() + tasks, prev.totalQty() + qty));
             }
         }
         List<DeviceStatDailyVO> out = new ArrayList<>(merged.values());

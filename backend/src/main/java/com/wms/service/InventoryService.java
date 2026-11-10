@@ -39,7 +39,7 @@ public class InventoryService {
         this.pendingActions = pendingActions;
     }
 
-    /** 按商品汇总；实存为 0 的商品不出现在结果中 */
+    /** 按货品汇总；实存为 0 的货品不出现在结果中 */
     public List<InventorySummaryVO> summary(String skuKeyword) {
         List<Inventory> list = inventoryRepo.findAllWithGraph();
         String kw = StringUtils.hasText(skuKeyword) ? skuKeyword.trim().toLowerCase() : "";
@@ -64,7 +64,7 @@ public class InventoryService {
             }
             map.put(p.getId(), s);
         }
-        // 实存为 0 的商品不展示（全部库位都空时不占列表）
+        // 实存为 0 的货品不展示（全部库位都空时不占列表）
         return map.values().stream().filter(s -> s.totalQty() > 0).collect(Collectors.toList());
     }
 

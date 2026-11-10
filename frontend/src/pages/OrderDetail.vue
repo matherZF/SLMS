@@ -24,7 +24,7 @@
 
         <div class="info-grid">
           <div class="info-item"><div class="label-muted">SKU编码</div><div class="value"><b>{{ detail.sku }}</b></div></div>
-          <div class="info-item"><div class="label-muted">商品名称</div><div class="value">{{ detail.productName }}</div></div>
+          <div class="info-item"><div class="label-muted">货品名称</div><div class="value">{{ detail.productName }}</div></div>
           <div class="info-item"><div class="label-muted">计划数量</div><div class="value">{{ detail.planQty }}</div></div>
           <div class="info-item"><div class="label-muted">已上架</div><div class="value" style="color: #12b76a"><b>{{ detail.putQty }}</b></div></div>
           <div class="info-item"><div class="label-muted">剩余</div><div class="value" style="color: #f5722c"><b>{{ remainingQty }}</b></div></div>
@@ -68,7 +68,7 @@
         </div>
         <el-empty
           v-if="!(detail?.items || []).length"
-          :description="detail?.status === 'PENDING' ? '暂未上架任何商品' : '无数据'"
+          :description="detail?.status === 'PENDING' ? '暂未上架任何货品' : '无数据'"
           :image-size="60"
         />
       </div>
@@ -77,7 +77,7 @@
         :data="detail?.items || []"
         stripe
         border
-        :empty-text="detail?.status === 'PENDING' ? '暂未上架任何商品' : '无数据'"
+        :empty-text="detail?.status === 'PENDING' ? '暂未上架任何货品' : '无数据'"
         style="width: 100%"
       >
         <el-table-column prop="locationCode" label="库位编码" min-width="140" />

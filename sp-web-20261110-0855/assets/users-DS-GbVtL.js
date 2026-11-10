@@ -1,0 +1,1 @@
+import{r}from"./index-D0G8da_f.js";const u={options(){return r.get("/user-options")},list(e={}){return r.get("/users",{params:e})},detail(e){return r.get(`/users/${e}`)},create(e){return r.post("/users",e)},update(e,t){return r.put(`/users/${e}`,t)},remove(e){return r.delete(`/users/${e}`)}};export{u};

@@ -37,7 +37,7 @@ public class ProductService {
 
     public ProductDTO getById(Long id) {
         return productRepo.findById(id).map(this::toDTO)
-                .orElseThrow(() -> new BizException("商品不存在"));
+                .orElseThrow(() -> new BizException("货品不存在"));
     }
 
     @Transactional
@@ -56,7 +56,7 @@ public class ProductService {
 
     @Transactional
     public ProductDTO update(Long id, ProductDTO dto) {
-        Product p = productRepo.findById(id).orElseThrow(() -> new BizException("商品不存在"));
+        Product p = productRepo.findById(id).orElseThrow(() -> new BizException("货品不存在"));
         String before = p.getName() + "/" + p.getSpec() + "/" + p.getUnit() + "/" + p.isEnabled();
         p.setName(dto.name() == null ? p.getName() : dto.name());
         p.setSpec(dto.spec() == null ? p.getSpec() : dto.spec());
@@ -70,9 +70,9 @@ public class ProductService {
 
     @Transactional
     public void delete(Long id) {
-        Product product = productRepo.findById(id).orElseThrow(() -> new BizException("商品不存在"));
+        Product product = productRepo.findById(id).orElseThrow(() -> new BizException("货品不存在"));
         if (putawayRepo.existsByProductId(id)) {
-            throw new BizException("该商品已在单据中使用，无法删除");
+            throw new BizException("该货品已在单据中使用，无法删除");
         }
         productRepo.deleteById(id);
         auditService.record("PRODUCT", id, product.getSku(), "DELETE", null, null, "删除备件：" + product.getName());

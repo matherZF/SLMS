@@ -1,7 +1,7 @@
 package com.wms.controller;
-import com.wms.common.BizException; import com.wms.common.Result; import com.wms.dto.DeviceStatDailyVO; import com.wms.entity.Equipment; import com.wms.repository.EquipmentRepository; import com.wms.service.DeviceStatDailyQuery; import com.wms.service.EquipmentService; import org.springframework.security.access.prepost.PreAuthorize;import org.springframework.data.domain.Page; import org.springframework.web.bind.annotation.*; import java.math.BigDecimal; import java.time.LocalDate; import java.util.*;
-@RestController @RequestMapping("/api/equipments") public class EquipmentController { private final EquipmentService s; private final EquipmentRepository equipmentRepo; private final DeviceStatDailyQuery statQuery;
- public EquipmentController(EquipmentService s, EquipmentRepository equipmentRepo, DeviceStatDailyQuery statQuery){this.s=s;this.equipmentRepo=equipmentRepo;this.statQuery=statQuery;}
+import com.wms.common.BizException; import com.wms.common.Result; import com.wms.dto.DeviceStatDailyVO; import com.wms.entity.Equipment; import com.wms.repository.EquipmentRepository; import com.wms.service.DeviceCodeResolver; import com.wms.service.DeviceStatDailyQuery; import com.wms.service.EquipmentService; import org.springframework.security.access.prepost.PreAuthorize;import org.springframework.data.domain.Page; import org.springframework.web.bind.annotation.*; import java.math.BigDecimal; import java.time.LocalDate; import java.util.*;
+@RestController @RequestMapping("/api/equipments") public class EquipmentController { private final EquipmentService s; private final EquipmentRepository equipmentRepo; private final DeviceStatDailyQuery statQuery; private final DeviceCodeResolver codeResolver;
+ public EquipmentController(EquipmentService s, EquipmentRepository equipmentRepo, DeviceStatDailyQuery statQuery, DeviceCodeResolver codeResolver){this.s=s;this.equipmentRepo=equipmentRepo;this.statQuery=statQuery;this.codeResolver=codeResolver;}
  @GetMapping public Result<List<Map<String,Object>>> list(@RequestParam(required=false)String keyword){return Result.ok(s.list(keyword));}
  @PostMapping @PreAuthorize("hasAuthority('master:edit')") public Result<Map<String,Object>> create(@RequestBody Map<String,Object> r){return Result.ok(s.save(null,r));}
  @PutMapping("/{id}") @PreAuthorize("hasAuthority('master:edit')") public Result<Map<String,Object>> update(@PathVariable Long id,@RequestBody Map<String,Object>r){return Result.ok(s.save(id,r));}
@@ -17,8 +17,9 @@ import com.wms.common.BizException; import com.wms.common.Result; import com.wms
   Equipment e=equipmentRepo.findById(id).orElseThrow(()->new BizException("设备不存在"));
   int n=(days==null||days<=0)?30:Math.min(days,366);
   LocalDate to=LocalDate.now(); LocalDate from=to.minusDays(n-1L);
-  // 跨源合计：同一台设备同一天在 DT/WMS/WCS 各有一行，按日合并求和（RB 三源供数场景）
-  List<DeviceStatDailyVO> rows=new ArrayList<>(statQuery.listMerged(e.getCode(),from,to));
+  // 取数完全按设备配置的映射规则：源 + 外部编码 + 勾选的指标；没配映射就没有数据
+  List<com.wms.service.DeviceCodeResolver.MappingRule> rules=codeResolver.rules(e.getCode());
+  List<DeviceStatDailyVO> rows=new ArrayList<>(statQuery.listMergedByRules(rules,from,to));
   BigDecimal hours=BigDecimal.ZERO; long tasks=0L, qty=0L;
   for(DeviceStatDailyVO r:rows){
    if(r.runningHours()!=null) hours=hours.add(r.runningHours());
@@ -29,7 +30,7 @@ import com.wms.common.BizException; import com.wms.common.Result; import com.wms
   Map<String,Object> out=new LinkedHashMap<>();
   out.put("deviceId",e.getId()); out.put("code",e.getCode()); out.put("name",e.getName()); out.put("model",e.getModel());
   out.put("location",e.getLocation()); out.put("zone",e.getZone()); out.put("status",e.getStatus()); out.put("manufacturer",e.getManufacturer());
-  out.put("days",n); out.put("from",from); out.put("to",to); out.put("totals",totals); out.put("rows",rows);
+  out.put("extRules",rules); out.put("days",n); out.put("from",from); out.put("to",to); out.put("totals",totals); out.put("rows",rows);
   return Result.ok(out);
  }
  /** 某备件装在哪些设备上，供出库单选择领用设备 */

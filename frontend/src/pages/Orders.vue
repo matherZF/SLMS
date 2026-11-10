@@ -38,7 +38,7 @@
       </div>
       <el-input
         v-model="filters.keyword"
-        placeholder="搜索商品 SKU / 名称"
+        placeholder="搜索货品 SKU / 名称"
         clearable
         @keyup.enter="onSearch"
         @clear="onSearch"
@@ -57,7 +57,7 @@
       </el-select>
       <el-input
         v-model="filters.keyword"
-        placeholder="商品 SKU / 名称"
+        placeholder="货品 SKU / 名称"
         clearable
         style="width: 240px"
         @keyup.enter="loadData"
@@ -83,7 +83,7 @@
             {{ row.status === 'DONE' ? '已完成' : '待上架' }}
           </span>
         </div>
-        <div class="m-line"><span class="m-label">商品</span><span class="m-val">{{ row.sku }} - {{ row.productName }}</span></div>
+        <div class="m-line"><span class="m-label">货品</span><span class="m-val">{{ row.sku }} - {{ row.productName }}</span></div>
         <div class="m-line"><span class="m-label">上架进度</span><span class="m-val"><b>{{ row.putQty }}</b> / {{ row.planQty }}（{{ row.progress || 0 }}%）</span></div>
         <div class="m-line"><span class="m-label">创建时间</span><span class="m-val">{{ formatTime(row.createdAt) }}</span></div>
         <el-progress
@@ -105,7 +105,7 @@
       style="width: 100%"
     >
       <el-table-column prop="orderNo" label="单号" min-width="170" />
-      <el-table-column label="商品" min-width="220">
+      <el-table-column label="货品" min-width="220">
         <template #default="{ row }">
           <b>{{ row.sku }}</b>
           <span style="color:#909399; margin-left:6px">-</span>

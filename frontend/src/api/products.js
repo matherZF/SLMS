@@ -1,6 +1,6 @@
 import request from './request'
 
-// 商品管理 API
+// 货品管理 API
 // 分页列表：返回 Spring Page 对象 { content, totalElements, totalPages, ... }
 export function list(params) {
   return request.get('/products', { params })

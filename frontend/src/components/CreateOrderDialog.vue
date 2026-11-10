@@ -15,11 +15,11 @@
       :label-position="isMobile ? 'top' : 'right'"
       @submit.prevent
     >
-      <el-form-item label="选择商品" prop="productId">
+      <el-form-item label="选择货品" prop="productId">
         <el-select
           v-model="form.productId"
           filterable
-          placeholder="搜索或选择商品"
+          placeholder="搜索或选择货品"
           style="width: 100%"
           :loading="productsLoading"
         >
@@ -137,11 +137,11 @@ const emptyForm = () => ({
 const form = reactive(emptyForm())
 
 const rules = {
-  productId: [{ required: true, message: '请选择商品', trigger: 'change' }],
+  productId: [{ required: true, message: '请选择货品', trigger: 'change' }],
   planQty: [{ required: true, message: '请输入计划数量', trigger: 'blur' }]
 }
 
-// 商品全量列表（分页取大值即可）
+// 货品全量列表（分页取大值即可）
 async function loadProducts() {
   productsLoading.value = true
   try {

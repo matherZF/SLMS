@@ -1,0 +1,1 @@
+import{r as o}from"./index-D0G8da_f.js";function r(t){return o.get("/locations",{params:t})}function s(t){return o.post("/locations",t)}function u(t,e){return o.put(`/locations/${t}`,e)}function a(t){return o.delete(`/locations/${t}`)}export{s as c,r as l,a as r,u};

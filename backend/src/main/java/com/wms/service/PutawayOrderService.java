@@ -62,7 +62,7 @@ public class PutawayOrderService {
     @Transactional
     public PutawayOrderDetailVO create(PutawayOrderCreateReq req) {
         Product product = productRepo.findById(req.productId())
-                .orElseThrow(() -> new BizException("商品不存在"));
+                .orElseThrow(() -> new BizException("货品不存在"));
         if (req.planQty() == null || req.planQty() <= 0) {
             throw new BizException("planQty必须大于0");
         }

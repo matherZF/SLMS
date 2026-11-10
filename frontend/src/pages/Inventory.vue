@@ -15,20 +15,20 @@
     <!-- 移动端：页签胶囊 + 搜索，一张卡（与入库筛选栏同款） -->
     <div v-if="isMobile" class="m-filter card-m">
       <div class="m-chips-row">
-        <button class="m-chip-btn" :class="{ on: activeTab === 'summary' }" @click="switchTab('summary')">按商品汇总</button>
+        <button class="m-chip-btn" :class="{ on: activeTab === 'summary' }" @click="switchTab('summary')">按货品汇总</button>
         <button class="m-chip-btn" :class="{ on: activeTab === 'details' }" @click="switchTab('details')">按库位明细</button>
         <span class="m-total">共 {{ activeTab === 'summary' ? summaries.length : details.length }} 条</span>
       </div>
       <el-input
         v-if="activeTab === 'summary'"
         v-model="s.summaryKeyword"
-        placeholder="搜索 SKU / 商品名称"
+        placeholder="搜索 SKU / 货品名称"
         clearable
       >
         <template #prefix><el-icon><Search /></el-icon></template>
       </el-input>
       <template v-else>
-        <el-input v-model="s.detailSku" placeholder="商品 SKU" clearable>
+        <el-input v-model="s.detailSku" placeholder="货品 SKU" clearable>
           <template #prefix><el-icon><Search /></el-icon></template>
         </el-input>
         <el-input v-model="s.detailLocation" placeholder="库位编码" clearable>
@@ -37,7 +37,7 @@
       </template>
     </div>
 
-    <!-- 移动端卡片列表：按商品汇总 -->
+    <!-- 移动端卡片列表：按货品汇总 -->
     <div v-if="isMobile && activeTab === 'summary'" v-loading="s.loading" class="m-card-list">
       <el-empty v-if="!s.loading && summaries.length === 0" description="暂无库存数据" :image-size="70" />
       <article v-for="row in summaries" :key="row.sku" class="m-card" @click="openSummaryDetail(row)">
@@ -45,7 +45,7 @@
           <b class="m-no">{{ row.sku }}</b>
           <span class="m-qty">实存 <b>{{ row.totalQty || 0 }}</b> {{ row.unit || '件' }}</span>
         </div>
-        <div class="m-line"><span class="m-label">商品名称</span><span class="m-val">{{ row.name }}</span></div>
+        <div class="m-line"><span class="m-label">货品名称</span><span class="m-val">{{ row.name }}</span></div>
         <div class="m-line" v-if="row.spec"><span class="m-label">规格</span><span class="m-val">{{ row.spec }}</span></div>
       </article>
     </div>
@@ -71,12 +71,12 @@
 
     <!-- 桌面端：页签 + 表格 -->
     <el-tabs v-if="!isMobile" v-model="activeTab" type="border-card" @tab-change="onTabChange">
-      <!-- Tab1：按商品汇总 -->
-      <el-tab-pane label="按商品汇总" name="summary">
+      <!-- Tab1：按货品汇总 -->
+      <el-tab-pane label="按货品汇总" name="summary">
         <div class="filter-bar">
           <el-input
             v-model="s.summaryKeyword"
-            placeholder="SKU / 商品名称关键字"
+            placeholder="SKU / 货品名称关键字"
             clearable
             style="width: 260px"
             @keyup.enter="loadSummary"
@@ -100,7 +100,7 @@
           empty-text="暂无库存数据"
         >
           <el-table-column prop="sku" label="SKU编码" min-width="140" />
-          <el-table-column prop="name" label="商品名称" min-width="180" />
+          <el-table-column prop="name" label="货品名称" min-width="180" />
           <el-table-column prop="spec" label="规格" min-width="120" />
           <el-table-column prop="unit" label="单位" width="90" align="center" />
           <el-table-column label="实存数量" width="120" align="center">
@@ -116,7 +116,7 @@
         <div class="filter-bar">
           <el-input
             v-model="s.detailSku"
-            placeholder="商品 SKU 关键字"
+            placeholder="货品 SKU 关键字"
             clearable
             style="width: 200px"
             @keyup.enter="loadDetails"
@@ -147,7 +147,7 @@
           <el-table-column prop="locationCode" label="库位编码" min-width="140" />
           <el-table-column prop="area" label="区域" width="100" />
           <el-table-column prop="sku" label="SKU" min-width="120" />
-          <el-table-column prop="productName" label="商品名称" min-width="160" />
+          <el-table-column prop="productName" label="货品名称" min-width="160" />
           <el-table-column label="实存" width="90" align="center">
             <template #default="{ row }">
               <b class="qty-num">{{ row.qty || 0 }}</b>
@@ -251,7 +251,7 @@
         <el-descriptions v-if="detailDialog.row" :column="1" border class="stock-summary">
           <template v-if="detailDialog.mode === 'summary'">
             <el-descriptions-item label="SKU">{{ detailDialog.row.sku }}</el-descriptions-item>
-            <el-descriptions-item label="商品名称">{{ detailDialog.row.name }}</el-descriptions-item>
+            <el-descriptions-item label="货品名称">{{ detailDialog.row.name }}</el-descriptions-item>
             <el-descriptions-item label="规格/单位">{{ detailDialog.row.spec || '-' }} / {{ detailDialog.row.unit || '件' }}</el-descriptions-item>
             <el-descriptions-item label="实存总量">{{ detailDialog.row.totalQty || 0 }} {{ detailDialog.row.unit || '件' }}</el-descriptions-item>
           </template>

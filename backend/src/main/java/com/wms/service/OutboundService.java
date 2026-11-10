@@ -104,7 +104,7 @@ public class OutboundService {
                 throw new BizException("数量必须大于0");
             }
             Product product = productRepo.findById(ir.productId())
-                    .orElseThrow(() -> new BizException("商品不存在: id=" + ir.productId()));
+                    .orElseThrow(() -> new BizException("货品不存在: id=" + ir.productId()));
             OutboundItem item = new OutboundItem();
             item.setOutboundOrder(order);
             item.setProduct(product);
@@ -187,13 +187,13 @@ public class OutboundService {
     }
 
     /**
-     * 查询某商品的可用库存列表（含批次详情），按 FIFO（到期日/生产日期升序）排序。
+     * 查询某货品的可用库存列表（含批次详情），按 FIFO（到期日/生产日期升序）排序。
      * 用于出库时人工选择库位/批次。
      */
     @Transactional(readOnly = true)
     public List<AvailableStockVO> listAvailableInventory(Long productId) {
         Product product = productRepo.findById(productId)
-                .orElseThrow(() -> new BizException("商品不存在"));
+                .orElseThrow(() -> new BizException("货品不存在"));
         List<Inventory> stocks = inventoryRepo.findAllByProductId(productId).stream()
                 .filter(s -> s.getAvailableQty() > 0)
                 .sorted(Comparator
@@ -284,7 +284,7 @@ public class OutboundService {
     }
 
     /**
-     * 开始拣货：为每个商品项按 FIFO 自动分配库位+批次，并点亮对应库位灯光设备。
+     * 开始拣货：为每个货品项按 FIFO 自动分配库位+批次，并点亮对应库位灯光设备。
      */
     @Transactional
     public Map<String, Object> startPicking(Long orderId) {
@@ -338,7 +338,7 @@ public class OutboundService {
                 pickingItems.add(mi);
                 continue;
             }
-            // 找到该商品有库存的库位，按 FIFO 排序（到期日/生产日期升序），取第一个满足数量的
+            // 找到该货品有库存的库位，按 FIFO 排序（到期日/生产日期升序），取第一个满足数量的
             List<Inventory> stocks = inventoryRepo.findAllByProductId(item.getProduct().getId()).stream()
                     .filter(s -> s.getAvailableQty() > 0)
                     .sorted(Comparator
@@ -359,7 +359,7 @@ public class OutboundService {
             if (stock == null) {
                 // 没有单个批次满足，取库存最大的一个提示不足
                 Inventory maxStock = stocks.stream().max(Comparator.comparingInt(Inventory::getAvailableQty)).orElse(null);
-                throw new BizException(String.format("商品 %s 无可用库存（最大单批次 %d 件）",
+                throw new BizException(String.format("货品 %s 无可用库存（最大单批次 %d 件）",
                         item.getProduct().getSku(),
                         maxStock != null ? maxStock.getAvailableQty() : 0));
             }
@@ -569,7 +569,7 @@ public class OutboundService {
                 throw new BizException("库存占用记录异常，请取消拣货后重新发起");
             if (inv.getQty() < item.getRequestedQty()) {
                 throw new BizException(String.format(
-                        "库位 %s 商品 %s 库存不足，剩余 %d 件",
+                        "库位 %s 货品 %s 库存不足，剩余 %d 件",
                         item.getLocation().getCode(), item.getProduct().getSku(), inv.getQty()));
             }
             int beforeQty = inv.getQty();

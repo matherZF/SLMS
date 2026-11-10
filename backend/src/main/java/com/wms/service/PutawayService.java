@@ -105,7 +105,7 @@ public class PutawayService {
         Product product = order.getProduct();
         Batch batch = order.getBatch();
         Long batchId = batch != null ? batch.getId() : null;
-        // 按 商品+库位+批次 定位库存记录（加锁：库存数量是 read-modify-write）
+        // 按 货品+库位+批次 定位库存记录（加锁：库存数量是 read-modify-write）
         Inventory inv;
         if (batchId != null) {
             inv = inventoryRepo.findByProductIdAndLocationIdAndBatchId(product.getId(), loc.getId(), batchId)

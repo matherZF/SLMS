@@ -33,11 +33,11 @@
       </div>
     </template>
 
-    <!-- Step 2：商品确认 -->
+    <!-- Step 2：货品确认 -->
     <template v-else-if="step === 2 && currentOrder">
       <PageHeader>
         <template #desc>上架作业 · 第 2 / 3 步</template>
-        商品确认
+        货品确认
       </PageHeader>
 
       <el-card class="info-card">

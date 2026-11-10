@@ -1,0 +1,1 @@
+import{r as s}from"./index-CNrjSFjl.js";const e=t=>s.get(`/dictionaries/options/${t}`),a=t=>s.get("/dictionaries",{params:t}),c=t=>s.post("/dictionaries",t),n=(t,o)=>s.put(`/dictionaries/${t}`,o);export{c,a as l,e as o,n as u};

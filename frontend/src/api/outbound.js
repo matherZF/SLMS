@@ -29,7 +29,7 @@ export function startPicking(id) {
   return request.post(`/outbound/${id}/start`)
 }
 
-// 查询某商品可用库存（含批次详情），用于人工选库位
+// 查询某货品可用库存（含批次详情），用于人工选库位
 export function availableStock(productId) {
   return request.get('/outbound/available-stock', { params: { productId } })
 }

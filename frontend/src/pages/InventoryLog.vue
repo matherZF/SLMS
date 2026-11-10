@@ -7,7 +7,7 @@
       <div class="card-m m-filter">
         <el-input
           v-model="s.sku"
-          placeholder="SKU / 商品名称"
+          placeholder="SKU / 货品名称"
           clearable
           @keyup.enter="onSearch"
         >
@@ -96,7 +96,7 @@
       <div class="filter-bar">
         <el-input
           v-model="s.sku"
-          placeholder="SKU / 商品名称"
+          placeholder="SKU / 货品名称"
           clearable
           style="width: 220px"
           @keyup.enter="onSearch"
@@ -155,7 +155,7 @@
           </template>
         </el-table-column>
         <el-table-column prop="sku" label="SKU" min-width="120" />
-        <el-table-column prop="productName" label="商品名称" min-width="160" show-overflow-tooltip />
+        <el-table-column prop="productName" label="货品名称" min-width="160" show-overflow-tooltip />
         <el-table-column prop="locationCode" label="库位" width="120" />
         <el-table-column label="变动数量" width="110" align="center">
           <template #default="{ row }">

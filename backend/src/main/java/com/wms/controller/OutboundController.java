@@ -55,7 +55,7 @@ public class OutboundController {
         return Result.ok(outboundService.create(req));
     }
 
-    /** 查询某商品的可用库存（含批次详情），用于人工选择库位/批次 */
+    /** 查询某货品的可用库存（含批次详情），用于人工选择库位/批次 */
     @GetMapping("/available-stock")
     @PreAuthorize("hasAuthority('outbound:picking')")
     public Result<List<AvailableStockVO>> availableStock(@RequestParam Long productId) {

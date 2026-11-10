@@ -1,0 +1,1 @@
+import{r}from"./index-CNrjSFjl.js";function o(t){return r.get("/products",{params:t})}function n(t){return r.post("/products",t)}function s(t,e){return r.put(`/products/${t}`,e)}function c(t){return r.delete(`/products/${t}`)}export{n as c,o as l,c as r,s as u};

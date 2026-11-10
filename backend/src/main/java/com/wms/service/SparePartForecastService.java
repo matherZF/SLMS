@@ -21,6 +21,7 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -56,6 +57,7 @@ public class SparePartForecastService {
     private final EquipmentPartRepository partRepo;
     private final InventoryRepository inventoryRepo;
     private final DeviceStatDailyRepository statRepo;
+    private final DeviceCodeResolver codeResolver;
 
     /** 用最近多少天的设备运行数据算日均；太短会被单日异常放大，太长跟不上产线变化。可在系统配置里改 */
     private final int fallbackProductionWindow;
@@ -69,6 +71,7 @@ public class SparePartForecastService {
                                     EquipmentPartRepository partRepo,
                                     InventoryRepository inventoryRepo,
                                     DeviceStatDailyRepository statRepo,
+                                    DeviceCodeResolver codeResolver,
                                     SystemConfigService configService,
                                     @Value("${spare-part.forecast.production-window-days:7}") int productionWindowDays,
                                     @Value("${spare-part.forecast.safety-days:7}") int safetyDays,
@@ -77,6 +80,7 @@ public class SparePartForecastService {
         this.partRepo = partRepo;
         this.inventoryRepo = inventoryRepo;
         this.statRepo = statRepo;
+        this.codeResolver = codeResolver;
         this.configService = configService;
         this.fallbackProductionWindow = productionWindowDays;
         this.fallbackSafetyDays = safetyDays;
@@ -140,18 +144,28 @@ public class SparePartForecastService {
     /** 每台设备最近窗口内的日均运行强度；窗口内没有任何一天数据的设备不进 map */
     private Map<String, DeviceOutput> averageDailyDevice(LocalDate today) {
         LocalDate from = today.minusDays(productionWindowDays());
+        // 只统计设备编辑页配置的映射规则命中的行，并且只累加该行勾选的指标；
+        // 没配映射的设备不参与预测（与设备详情页"没配就不显示数据"保持一致）。
+        Map<String, DeviceCodeResolver.RuleRef> ruleIndex = codeResolver.ruleIndex();
         Map<String, Accumulator> acc = new LinkedHashMap<>();
         for (DeviceStatDaily row : statRepo.findByStatDateBetween(from, today)) {
-            Accumulator slot = acc.computeIfAbsent(row.getDeviceCode(), k -> new Accumulator());
-            slot.days += 1;
-            slot.hours = slot.hours.add(nz(row.getRunningHours()));
-            slot.tasks = slot.tasks.add(nz(row.getTaskCount()));
-            slot.qty = slot.qty.add(nz(row.getTotalQty()));
+            DeviceCodeResolver.RuleRef ref = ruleIndex.get(
+                    DeviceCodeResolver.normalizeKey(row.getSourceSys(), row.getDeviceCode()));
+            if (ref == null) continue;
+            DeviceCodeResolver.MappingRule rule = ref.rule();
+            if (!rule.takesAnything()) continue;
+            Accumulator slot = acc.computeIfAbsent(ref.equipmentCode(), k -> new Accumulator());
+            // 日均的分母按"日期+类型"去重：同一设备多个编码/多个源同一天各一行只算 1 天，
+            // 避免日均被稀释
+            slot.dayTypeKeys.add(row.getStatDate() + "|" + row.getDeviceType());
+            if (rule.takeHours()) slot.hours = slot.hours.add(nz(row.getRunningHours()));
+            if (rule.takeTasks()) slot.tasks = slot.tasks.add(nz(row.getTaskCount()));
+            if (rule.takeQty()) slot.qty = slot.qty.add(nz(row.getTotalQty()));
         }
         Map<String, DeviceOutput> result = new HashMap<>();
         acc.forEach((code, slot) -> {
-            if (slot.days == 0) return;
-            BigDecimal days = BigDecimal.valueOf(slot.days);
+            if (slot.dayTypeKeys.isEmpty()) return;
+            BigDecimal days = BigDecimal.valueOf(slot.dayTypeKeys.size());
             result.put(code, new DeviceOutput(
                     avg(slot.hours, days), avg(slot.tasks, days), avg(slot.qty, days)));
         });
@@ -168,7 +182,8 @@ public class SparePartForecastService {
     }
 
     private static final class Accumulator {
-        int days;
+        // key = 日期|设备类型，去重后 size 就是日均的分母天数
+        final Set<String> dayTypeKeys = new HashSet<>();
         BigDecimal hours = BigDecimal.ZERO;
         BigDecimal tasks = BigDecimal.ZERO;
         BigDecimal qty = BigDecimal.ZERO;
