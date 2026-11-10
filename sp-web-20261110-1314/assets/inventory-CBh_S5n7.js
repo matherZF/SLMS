@@ -1,1 +1,0 @@
-import{r as n}from"./index-CNrjSFjl.js";function s(t){return n.get("/inventory/summary",{params:t})}function e(t){return n.get("/inventory/details",{params:t})}function a(t){return n.post("/inventory/adjustments",t)}function o(t){return n.post("/inventory/transfers",t)}export{a,e as d,s,o as t};
