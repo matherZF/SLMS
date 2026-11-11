@@ -1,7 +1,7 @@
 <template>
   <div class="login-container">
     <div class="login-scene">
-      <div class="scene-kicker">SPARE PARTS · DIGITAL TWIN</div>
+      <div class="scene-kicker">SPARES LIFECYCLE MANAGEMENT SYSTEM</div>
       <h2>让每一件备件<br><span>全程可见、全程可溯</span></h2>
       <p>标准化数字台账 · 全生命周期管理 · 智能库存预警</p>
       <div class="scene-grid"><span>01 主数据标准</span><span>02 流程数字化</span><span>03 寿命跟踪</span><span>04 决策预测</span></div>
@@ -10,7 +10,7 @@
       <div class="login-header">
         <div class="login-logo"><el-icon class="logo-icon"><Box /></el-icon></div>
         <h1 class="login-title">备品备件管理系统</h1>
-        <p class="login-subtitle">SPARE PARTS MANAGEMENT PLATFORM</p>
+        <p class="login-subtitle">SPARES LIFECYCLE MANAGEMENT SYSTEM</p>
       </div>
       <el-form ref="formRef" :model="form" :rules="rules" label-position="top" size="large" @submit.prevent="handleLogin">
         <el-form-item label="用户名" prop="username">

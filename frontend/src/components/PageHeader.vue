@@ -2,7 +2,7 @@
   <!-- App 外壳下隐藏标题区（顶栏已显示页面名），仅保留操作按钮 -->
   <div v-if="!isMobile" class="page-header-comp">
     <div>
-      <div class="page-kicker">SPARE PARTS DIGITAL PLATFORM</div>
+      <div class="page-kicker">SPARES LIFECYCLE MANAGEMENT SYSTEM</div>
       <h2 class="page-title"><slot /></h2>
       <div v-if="$slots.desc" class="page-desc"><slot name="desc" /></div>
     </div>

@@ -4,7 +4,7 @@
     <header class="app-header">
       <div class="app-brand">
         <el-icon v-if="route.meta.hidden" class="back-icon" @click="router.back()"><ArrowLeft /></el-icon>
-        <span v-else class="brand-mark">SP</span>
+        <span v-else class="brand-mark">SL</span>
         <span class="app-title">{{ $route.meta.title || '备品备件管理' }}</span>
       </div>
       <!-- 右侧：消息中心 + 用户 + 退出 -->

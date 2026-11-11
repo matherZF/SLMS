@@ -103,7 +103,7 @@ const heroActions = computed(() => {
   return list.slice(0, 4)
 })
 
-// 服务宫格（鄂汇办式彩色图标，按权限过滤）
+// 服务宫格（彩色图标，按权限过滤）
 // m: false 表示该服务不在移动端宫格展示（系统管理/低频配置类，桌面端操作更合适）
 const services = computed(() => {
   const list = [

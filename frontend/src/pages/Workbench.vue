@@ -1,5 +1,5 @@
 <template>
-  <!-- 首页按平台分流：App 外壳（APP + 手机浏览器）走鄂汇办式移动首页，桌面端保持原版 -->
+  <!-- 首页按平台分流：App 外壳（APP + 手机浏览器）走移动端首页，桌面端保持原版 -->
   <MobileHome v-if="isAppShell" />
   <DesktopHome v-else />
 </template>
