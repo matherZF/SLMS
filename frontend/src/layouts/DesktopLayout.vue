@@ -74,7 +74,7 @@
       <!-- 顶部 Header -->
       <el-header height="60px" class="header">
         <div class="header-left">
-          <div><span class="sys-title">数字化备品备件管理平台</span><span class="environment-dot">内网运行</span></div>
+          <div><span class="sys-title">备品备件全生命周期管理</span><span class="environment-dot">内网运行</span></div>
         </div>
         <div class="header-right">
           <el-breadcrumb separator="/">

@@ -2,7 +2,7 @@ import { createRouter, createWebHashHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { firstAccessiblePath, FORBIDDEN_PATH } from './access'
 
-const SYS_NAME = '备品备件管理'
+const SYS_NAME = '备品备件管理系统'
 
 // 使用 hash 模式，便于 jar 部署时不需要 history fallback 配置
 const routes = [
