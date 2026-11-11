@@ -3,8 +3,13 @@ package com.wms.service;
 import com.wms.common.BizException;
 import com.wms.dto.ProductDTO;
 import com.wms.entity.Product;
+import com.wms.repository.BatchRepository;
+import com.wms.repository.EquipmentPartRepository;
+import com.wms.repository.InventoryRepository;
+import com.wms.repository.OutboundItemRepository;
 import com.wms.repository.ProductRepository;
 import com.wms.repository.PutawayOrderRepository;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -17,11 +22,22 @@ import org.springframework.util.StringUtils;
 public class ProductService {
     private final ProductRepository productRepo;
     private final PutawayOrderRepository putawayRepo;
+    private final OutboundItemRepository outboundItemRepo;
+    private final InventoryRepository inventoryRepo;
+    private final BatchRepository batchRepo;
+    private final EquipmentPartRepository equipmentPartRepo;
     private final OperationAuditService auditService;
 
-    public ProductService(ProductRepository productRepo, PutawayOrderRepository putawayRepo, OperationAuditService auditService) {
+    public ProductService(ProductRepository productRepo, PutawayOrderRepository putawayRepo,
+                          OutboundItemRepository outboundItemRepo, InventoryRepository inventoryRepo,
+                          BatchRepository batchRepo, EquipmentPartRepository equipmentPartRepo,
+                          OperationAuditService auditService) {
         this.productRepo = productRepo;
         this.putawayRepo = putawayRepo;
+        this.outboundItemRepo = outboundItemRepo;
+        this.inventoryRepo = inventoryRepo;
+        this.batchRepo = batchRepo;
+        this.equipmentPartRepo = equipmentPartRepo;
         this.auditService = auditService;
     }
 
@@ -71,10 +87,32 @@ public class ProductService {
     @Transactional
     public void delete(Long id) {
         Product product = productRepo.findById(id).orElseThrow(() -> new BizException("货品不存在"));
-        if (putawayRepo.existsByProductId(id)) {
-            throw new BizException("该货品已在单据中使用，无法删除");
+        // wms_product 被 5 张表外键引用（上架单 / 出库明细 / 库存 / 批次 / 设备关联备件），
+        // 只靠数据库拦会抛出 "Cannot delete or update a parent row" 这种看不懂的 500，
+        // 这里按引用来源逐个给出能直接照做的提示。
+        int boundEquipments = equipmentPartRepo.findByProductId(id).size();
+        if (boundEquipments > 0) {
+            throw new BizException("该货品已关联 " + boundEquipments + " 台设备，请先到「设备管理 - 关联备件」里解绑后再删除");
         }
-        productRepo.deleteById(id);
+        if (inventoryRepo.countByProductId(id) > 0) {
+            throw new BizException("该货品存在库存记录，请先把库存出库清零后再删除");
+        }
+        if (putawayRepo.existsByProductId(id)) {
+            throw new BizException("该货品已在入库上架单中使用，无法删除（历史单据需保留）");
+        }
+        if (outboundItemRepo.existsByProductId(id)) {
+            throw new BizException("该货品已在出库单中使用，无法删除（历史单据需保留）");
+        }
+        if (!batchRepo.findByProductId(id).isEmpty()) {
+            throw new BizException("该货品存在批次记录，无法删除");
+        }
+        try {
+            productRepo.delete(product);
+            // 立即 flush，把外键冲突暴露在这个 try 里，避免在事务提交时才炸成 SQL 500
+            productRepo.flush();
+        } catch (DataIntegrityViolationException e) {
+            throw new BizException("该货品已被业务数据引用（可能存在备件使用记录等历史数据），无法删除");
+        }
         auditService.record("PRODUCT", id, product.getSku(), "DELETE", null, null, "删除备件：" + product.getName());
     }
 

@@ -44,6 +44,9 @@ public class DeviceService {
         this.eslEnabled = eslEnabled;
     }
 
+    /** 是否启用实际的电子标签调用（eslabel.enabled，默认 true）。供业务侧判断是否要求标签按键回传 */
+    public boolean isEslEnabled() { return eslEnabled; }
+
     /**
      * 点亮指定库位绑定的电子标签 LED（常亮 + 红色，30 秒自动熄灭）。
      * <p>

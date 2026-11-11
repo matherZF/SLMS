@@ -42,6 +42,7 @@ public class OutboundService {
     private final PendingBusinessActionService pendingActions;
     private final NumberSequenceService numberSequence;
     private final DeviceSignalPublisher deviceSignals;
+    private final DeviceService deviceService;
 
     public OutboundService(OutboundOrderRepository orderRepo,
                            OutboundItemRepository itemRepo,
@@ -52,7 +53,8 @@ public class OutboundService {
                            EquipmentRepository equipmentRepo,
                            SparePartUsageService sparePartUsageService, OperationAuditService auditService,
                            ApprovalService approvalService, PendingBusinessActionService pendingActions,
-                           NumberSequenceService numberSequence, DeviceSignalPublisher deviceSignals) {
+                           NumberSequenceService numberSequence, DeviceSignalPublisher deviceSignals,
+                           DeviceService deviceService) {
         this.orderRepo = orderRepo;
         this.itemRepo = itemRepo;
         this.locationRepo = locationRepo;
@@ -67,6 +69,7 @@ public class OutboundService {
         this.pendingActions = pendingActions;
         this.numberSequence = numberSequence;
         this.deviceSignals = deviceSignals;
+        this.deviceService = deviceService;
     }
 
     /**
@@ -553,8 +556,10 @@ public class OutboundService {
             if (item.getLocation() == null) {
                 throw new BizException("存在未分配库位的拣货项，请先开始拣货");
             }
-            // 扫码核验由"必要条件"改为"可选条件"，按键回调作为必要条件
-            if (!item.isButtonPressed()) {
+            // 扫码核验由"必要条件"改为"可选条件"，按键回调作为必要条件；
+            // 但电子标签开关未开启（eslabel.enabled=false）或库位未绑定标签（deviceNo 为空）时，
+            // 标签根本没有参与本次出库（点灯已跳过），按键回调不可能到来，此时不再校验按键
+            if (buttonRequired(item) && !item.isButtonPressed()) {
                 throw new BizException(String.format(
                         "备件 %s 库位 %s 尚未收到电子标签按键回调，请在标签上按下右下按键后重试",
                         item.getProduct().getSku(),
@@ -784,6 +789,25 @@ public class OutboundService {
             return null;
         }
         return String.valueOf(auth.getPrincipal());
+    }
+
+    /**
+     * 该拣货项是否必须校验电子标签按键回传。
+     * <p>
+     * 只有"标签真的参与了这个库位的本次出库"才校验：
+     * <ul>
+     *   <li>电子标签开关关闭（eslabel.enabled=false）——点灯本身就是桩实现，回调永远不来；</li>
+     *   <li>库位未绑定标签（deviceNo 为空）——没有可按的标签。</li>
+     * </ul>
+     * 两种情况都与 {@link DeviceService#lightUp} 跳过点灯的条件保持一致，避免
+     * "灯没亮却要求按灯上按键"的死锁。
+     */
+    private boolean buttonRequired(OutboundItem item) {
+        Location loc = item.getLocation();
+        if (loc == null) return false;
+        String mac = loc.getDeviceNo();
+        if (mac == null || mac.isBlank()) return false;
+        return deviceService.isEslEnabled();
     }
 
     private Inventory findLockedInventory(OutboundItem item) {

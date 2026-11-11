@@ -18,6 +18,9 @@ public interface InventoryRepository extends JpaRepository<Inventory, Long> {
     Optional<Inventory> findByProductIdAndLocationIdAndBatchId(Long productId, Long locationId, Long batchId);
 
     List<Inventory> findAllByProductId(Long productId);
+
+    /** 删除货品前判断是否还有库存记录（含已清零的空库位行，它们同样受外键约束） */
+    long countByProductId(Long productId);
     List<Inventory> findAllByLocationId(Long locationId);
 
     @EntityGraph(attributePaths = {"product", "location", "batch"})

@@ -29,4 +29,7 @@ public interface OutboundItemRepository extends JpaRepository<OutboundItem, Long
     Optional<OutboundItem> findByLightCmdtoken(String lightCmdtoken);
 
     Optional<OutboundItem> findFirstById(Long id);
+
+    /** 删除货品前判断是否被出库明细引用 */
+    boolean existsByProductId(Long productId);
 }

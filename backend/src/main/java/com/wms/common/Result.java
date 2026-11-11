@@ -1,5 +1,7 @@
 package com.wms.common;
 
+import jakarta.annotation.Nonnull;
+
 public class Result<T> {
     private int code;
     private String msg;
@@ -32,6 +34,7 @@ public class Result<T> {
         return r;
     }
 
+    @Nonnull
     public static <T> Result<T> fail(int code, String msg) {
         Result<T> r = new Result<>();
         r.setCode(code);
