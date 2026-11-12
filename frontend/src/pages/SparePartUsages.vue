@@ -2,7 +2,7 @@
   <div class="page-container usage-page" :class="{ 'm-page': isMobile }">
     <PageHeader>
       备件使用台账
-      <template #desc>备件在某台设备上的使用跟踪；双击台账行可打开详情</template>
+      <template #desc>{{ isMobile ? '备件在某台设备上的使用跟踪；点击台账卡片可查看详情' : '备件在某台设备上的使用跟踪；双击台账行可打开详情' }}</template>
     </PageHeader>
     <el-alert v-if="!isMobile" type="info" :closable="false" show-icon class="notice">
       <template #default>
@@ -28,7 +28,7 @@
       <div class="m-count">共 {{ total }} 条台账</div>
 
       <div v-loading="loading" class="m-list">
-        <div v-for="row in rows" :key="row.id" class="m-card">
+        <div v-for="row in rows" :key="row.id" class="m-card" @click="showDetail(row.id)">
           <div class="m-card-top">
             <div class="m-title-wrap">
               <span class="m-title">{{ row.productName }}</span>
@@ -54,9 +54,9 @@
           </div>
           <div v-else class="m-life m-dim">{{ row.lifeMetric === 'NONE' ? '未配置寿命计算' : '尚无可用基准' }}</div>
           <div class="m-actions">
-            <el-button size="small" type="primary" plain @click="showDetail(row.id)">详情</el-button>
-            <el-button v-if="canOperateUsage && row.lifeMetric!=='NONE'&&!isEnded(row)" size="small" type="success" plain :loading="refreshingId===row.id" @click="refreshOne(row)">刷新</el-button>
-            <el-button v-if="canOperateUsage && !isEnded(row)" size="small" type="danger" plain @click="endUsage(row)">结束跟踪</el-button>
+            <el-button size="small" type="primary" plain @click.stop="showDetail(row.id)">详情</el-button>
+            <el-button v-if="canOperateUsage && row.lifeMetric!=='NONE'&&!isEnded(row)" size="small" type="success" plain :loading="refreshingId===row.id" @click.stop="refreshOne(row)">刷新</el-button>
+            <el-button v-if="canOperateUsage && !isEnded(row)" size="small" type="danger" plain @click.stop="endUsage(row)">结束跟踪</el-button>
           </div>
         </div>
         <el-empty v-if="!loading && !rows.length" description="暂无使用台账" />
@@ -126,10 +126,19 @@
     <div class="pagination"><el-pagination v-model:current-page="page.page" v-model:page-size="page.size" :total="total" :page-sizes="[10,20,50,100]" layout="total, sizes, prev, pager, next" @current-change="load" @size-change="load" /></div>
     </template>
 
-    <!-- 详情：右侧抽屉（与设备管理详情一致的样式），双击台账行也可打开 -->
-    <el-drawer v-model="detailVisible" direction="rtl" :size="isMobile ? '92%' : '760px'" :title="detailTitle" destroy-on-close>
+    <!-- 详情：桌面端右侧抽屉（与设备管理详情一致），移动端仍用居中弹框；
+         双击台账行也可打开（桌面端） -->
+    <component
+      :is="isMobile ? ElDialog : ElDrawer"
+      v-model="detailVisible"
+      :title="detailTitle"
+      :width="'95%'"
+      :size="'760px'"
+      direction="rtl"
+      destroy-on-close
+    >
       <div class="usage-detail">
-      <el-descriptions v-if="current" :column="isMobile ? 1 : 2" border size="small">
+      <el-descriptions v-if="current" :column="2" border size="small">
         <el-descriptions-item label="使用台账号" :span="2">{{ current.usageNo }}</el-descriptions-item>
         <el-descriptions-item label="备件">{{ current.sku }} / {{ current.productName }}</el-descriptions-item>
         <el-descriptions-item label="批次">{{ current.batchNo || '-' }}</el-descriptions-item>
@@ -200,13 +209,13 @@
         <el-table-column label="比例" width="62"><template #default="{row}">{{ row.usedPercent == null ? '-' : row.usedPercent+'%' }}</template></el-table-column>
       </el-table>
       </div>
-    </el-drawer>
+    </component>
   </div>
 </template>
 
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage, ElMessageBox, ElDialog, ElDrawer } from 'element-plus'
 import PageHeader from '@/components/PageHeader.vue'
 import * as usageApi from '@/api/sparePartUsages'
 import { useMobile } from '@/composables/useMobile'
@@ -314,7 +323,8 @@ onMounted(load)
 .m-add { width: 100%; margin: 0; min-height: 40px; }
 .m-count { margin: 12px 14px 0; font-size: 12px; color: #7a8699; }
 .m-list { display: flex; flex-direction: column; gap: 10px; padding: 10px 12px 0; min-height: 120px; }
-.m-card { background: #fff; border-radius: 14px; padding: 12px; box-shadow: 0 2px 10px rgba(30, 60, 120, .05); }
+.m-card { background: #fff; border-radius: 14px; padding: 12px; box-shadow: 0 2px 10px rgba(30, 60, 120, .05); cursor: pointer; transition: transform .15s, box-shadow .15s; }
+.m-card:active { transform: scale(.995); box-shadow: 0 1px 6px rgba(30, 60, 120, .1); }
 .m-card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
 .m-title-wrap { min-width: 0; }
 .m-title { font-size: 15px; font-weight: 600; color: #1f2d3d; }
