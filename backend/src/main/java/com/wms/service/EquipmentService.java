@@ -56,6 +56,29 @@ import com.wms.common.BizException; import com.wms.entity.*; import com.wms.repo
   }
   return new ArrayList<>(out.values());
  }
+ /** 批量关联：一个备件一次绑到多台设备（数据初始化场景，如同一备件装在 40 台设备上）。已有关联的设备按本次参数覆盖更新。 */
+ @Transactional public Map<String,Object> bindPartBulk(Long productId,Map<String,Object> req){
+  Product p=productRepo.findById(productId).orElseThrow(()->new BizException("备件不存在"));
+  Object idsObj=req.get("equipmentIds");
+  if(!(idsObj instanceof List<?> rawIds)||rawIds.isEmpty())throw new BizException("请至少选择一台设备");
+  int qty=Optional.ofNullable(integer(req,"installedQty")).orElse(1);
+  if(qty<=0)throw new BizException("单机数量必须大于 0");
+  Integer cycle=integer(req,"changeCycleDays");
+  if(cycle!=null&&cycle<=0)throw new BizException("更换周期必须大于 0 天");
+  int created=0,updated=0;
+  LinkedHashMap<Long,Equipment> byId=new LinkedHashMap<>();
+  for(Object o:(List<?>)idsObj){Long id=Long.valueOf(String.valueOf(o));Equipment e=equipmentRepo.findById(id).orElseThrow(()->new BizException("设备不存在（id="+id+"）"));byId.put(id,e);}
+  for(Map.Entry<Long,Equipment> en:byId.entrySet()){
+   Equipment e=en.getValue();
+   EquipmentPart x=partRepo.findByEquipmentIdAndProductId(e.getId(),productId).orElseGet(EquipmentPart::new);
+   if(x.getId()==null){x.setEquipment(e);x.setProduct(p);created++;}else updated++;
+   x.setInstalledQty(qty);x.setChangeCycleDays(cycle);partRepo.save(x);
+  }
+  auditService.record("PRODUCT",productId,p.getSku(),"BIND_PART_BULK",null,null,"批量关联设备：新增 "+created+" 台、更新 "+updated+" 台；单机数量 "+qty+(cycle!=null?"；更换周期 "+cycle+" 天":""));
+  Map<String,Object> out=new LinkedHashMap<>();
+  out.put("productId",productId);out.put("total",byId.size());out.put("created",created);out.put("updated",updated);
+  return out;
+ }
  /** 修改已关联备件的参数；备件本身不可换（换备件=解绑后重新关联），避免撞 equipment_id+product_id 唯一键 */
  @Transactional public Map<String,Object> updatePart(Long equipmentId,Long partId,Map<String,Object> req){EquipmentPart x=requirePart(equipmentId,partId);
   // 只覆盖请求里出现的字段：避免前端只传一个字段时把其余字段清空

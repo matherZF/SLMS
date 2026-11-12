@@ -2,19 +2,24 @@ package com.wms.controller;
 
 import com.wms.common.Result;
 import com.wms.dto.ProductDTO;
+import com.wms.service.EquipmentService;
 import com.wms.service.ProductService;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Map;
+
 @RestController
 @RequestMapping("/api/products")
 public class ProductController {
     private final ProductService productService;
+    private final EquipmentService equipmentService;
 
-    public ProductController(ProductService productService) {
+    public ProductController(ProductService productService, EquipmentService equipmentService) {
         this.productService = productService;
+        this.equipmentService = equipmentService;
     }
 
     @GetMapping
@@ -48,5 +53,12 @@ public class ProductController {
     public Result<Void> delete(@PathVariable Long id) {
         productService.delete(id);
         return Result.ok();
+    }
+
+    /** 批量关联设备：一个备件一次绑到多台设备（数据初始化场景）。 */
+    @PostMapping("/{id}/equipments")
+    @PreAuthorize("hasAuthority('master:edit')")
+    public Result<Map<String, Object>> bindEquipments(@PathVariable Long id, @RequestBody Map<String, Object> req) {
+        return Result.ok(equipmentService.bindPartBulk(id, req));
     }
 }

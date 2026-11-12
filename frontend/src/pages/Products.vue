@@ -44,6 +44,7 @@
           </div>
           <div v-if="auth.can('master:edit')" class="m-actions">
             <el-button size="small" type="primary" plain @click="openDialog(row)">编辑</el-button>
+            <el-button size="small" type="success" plain @click="openBind(row)">关联设备</el-button>
             <el-button size="small" type="danger" plain @click="handleDelete(row)">删除</el-button>
           </div>
         </div>
@@ -114,10 +115,13 @@
           {{ formatTime(row.createdAt) }}
         </template>
       </el-table-column>
-      <el-table-column v-if="auth.can('master:edit')" label="操作" width="180" fixed="right">
+      <el-table-column v-if="auth.can('master:edit')" label="操作" width="260" fixed="right">
         <template #default="{ row }">
           <el-button size="small" @click="openDialog(row)">
             <el-icon><Edit /></el-icon>&nbsp;编辑
+          </el-button>
+          <el-button size="small" type="success" plain @click="openBind(row)">
+            <el-icon><Connection /></el-icon>&nbsp;关联设备
           </el-button>
           <el-button
             size="small"
@@ -150,6 +154,12 @@
       :row="currentRow"
       @success="loadData"
     />
+
+    <!-- 批量关联设备 Dialog -->
+    <BindEquipmentsDialog
+      v-model="bindVisible"
+      :product="bindRow"
+    />
   </div>
 </template>
 
@@ -159,6 +169,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import * as productsApi from '@/api/products'
 import PageHeader from '@/components/PageHeader.vue'
 import ProductFormDialog from '@/components/ProductFormDialog.vue'
+import BindEquipmentsDialog from '@/components/BindEquipmentsDialog.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useMobile } from '@/composables/useMobile'
 
@@ -177,6 +188,15 @@ const loading = ref(false)
 // 弹窗状态
 const dialogVisible = ref(false)
 const currentRow = ref(null)
+
+// 批量关联设备弹窗
+const bindVisible = ref(false)
+const bindRow = ref(null)
+
+function openBind(row) {
+  bindRow.value = row
+  bindVisible.value = true
+}
 
 // 加载列表
 async function loadData() {

@@ -25,3 +25,8 @@ export function update(id, payload) {
 export function remove(id) {
   return request.delete(`/products/${id}`)
 }
+
+// 批量关联设备：一个备件一次绑到多台设备（数据初始化场景）
+export function bindEquipments(id, payload) {
+  return request.post(`/products/${id}/equipments`, payload)
+}
