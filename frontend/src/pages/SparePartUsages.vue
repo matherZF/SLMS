@@ -1,6 +1,9 @@
 <template>
   <div class="page-container usage-page" :class="{ 'm-page': isMobile }">
-    <PageHeader>备件使用台账</PageHeader>
+    <PageHeader>
+      备件使用台账
+      <template #desc>备件在某台设备上的使用跟踪；双击台账行可打开详情</template>
+    </PageHeader>
     <el-alert v-if="!isMobile" type="info" :closable="false" show-icon class="notice">
       <template #default>
         <div>领用单确认出库即视为备件开始使用，系统自动建立台账并记录设备运行基准；本阶段不登记更换下来的旧备件。</div>
@@ -83,7 +86,7 @@
       <el-button v-if="canOperateUsage" type="success" :loading="refreshingAll" @click="refreshAll"><el-icon><Refresh /></el-icon>&nbsp;刷新全部寿命数据</el-button>
     </div>
 
-    <el-table v-loading="loading" :data="rows" border stripe>
+    <el-table v-loading="loading" :data="rows" border stripe class="usage-table" @row-dblclick="row => showDetail(row.id)">
       <el-table-column prop="usageNo" label="使用台账号" min-width="210" show-overflow-tooltip />
       <el-table-column label="备件" min-width="210">
         <template #default="{row}"><div>{{ row.productName }}</div><small>{{ row.sku }}<span v-if="row.spec"> · {{ row.spec }}</span></small></template>
@@ -123,8 +126,10 @@
     <div class="pagination"><el-pagination v-model:current-page="page.page" v-model:page-size="page.size" :total="total" :page-sizes="[10,20,50,100]" layout="total, sizes, prev, pager, next" @current-change="load" @size-change="load" /></div>
     </template>
 
-    <el-dialog v-model="detailVisible" title="备件使用详情" width="760px">
-      <el-descriptions v-if="current" :column="2" border>
+    <!-- 详情：右侧抽屉（与设备管理详情一致的样式），双击台账行也可打开 -->
+    <el-drawer v-model="detailVisible" direction="rtl" :size="isMobile ? '92%' : '760px'" :title="detailTitle" destroy-on-close>
+      <div class="usage-detail">
+      <el-descriptions v-if="current" :column="isMobile ? 1 : 2" border size="small">
         <el-descriptions-item label="使用台账号" :span="2">{{ current.usageNo }}</el-descriptions-item>
         <el-descriptions-item label="备件">{{ current.sku }} / {{ current.productName }}</el-descriptions-item>
         <el-descriptions-item label="批次">{{ current.batchNo || '-' }}</el-descriptions-item>
@@ -160,22 +165,22 @@
       <template v-if="(current?.lifeMetrics||[]).length">
         <el-divider content-position="left">计量口径明细（多口径按最严判定）</el-divider>
         <el-table :data="current.lifeMetrics" size="small" border>
-          <el-table-column label="计量口径" width="180">
+          <el-table-column label="计量口径" width="150">
             <template #default="{row}">
               {{ metricText(row.metric) }}
               <el-tag v-if="row.primary" size="small" type="primary" effect="plain" style="margin-left:6px">取严</el-tag>
             </template>
           </el-table-column>
-          <el-table-column label="已用" width="140"><template #default="{row}">{{ valueText(row.usedLifeValue,row.metric) }}</template></el-table-column>
-          <el-table-column label="额定" width="140"><template #default="{row}">{{ valueText(row.ratedLifeValue,row.metric) }}</template></el-table-column>
-          <el-table-column label="已用比例" min-width="180">
+          <el-table-column label="已用" width="110"><template #default="{row}">{{ valueText(row.usedLifeValue,row.metric) }}</template></el-table-column>
+          <el-table-column label="额定" width="110"><template #default="{row}">{{ valueText(row.ratedLifeValue,row.metric) }}</template></el-table-column>
+          <el-table-column label="已用比例" min-width="150">
             <template #default="{row}">
               <el-progress v-if="row.usedPercent!=null" :percentage="Math.min(row.usedPercent,100)"
                            :status="progressOf(row.usedPercent,current.status)" :stroke-width="8" />
               <span v-else class="m-dim">尚无基准</span>
             </template>
           </el-table-column>
-          <el-table-column label="预计耗尽" width="115">
+          <el-table-column label="预计耗尽" width="105">
             <template #default="{row}">
               <span v-if="row.expectedEndAt">{{ formatDate(row.expectedEndAt) }}</span>
               <span v-else class="m-dim">样本不足</span>
@@ -185,16 +190,17 @@
       </template>
       <el-divider content-position="left">同步历史（最近100条）</el-divider>
       <el-table :data="history" size="small" border max-height="280">
-        <el-table-column label="采集时间" width="170"><template #default="{row}">{{ formatTime(row.collectedAt) }}</template></el-table-column>
-        <el-table-column label="来源" width="100"><template #default="{row}">{{ sourceText(row.source) }}</template></el-table-column>
-        <el-table-column label="主导口径" width="110"><template #default="{row}">{{ metricText(row.lifeMetric) }}</template></el-table-column>
-        <el-table-column prop="runningHours" label="累计小时" width="100"><template #default="{row}">{{ row.runningHours ?? '-' }}</template></el-table-column>
-        <el-table-column prop="taskCount" label="累计任务" width="100"><template #default="{row}">{{ row.taskCount ?? '-' }}</template></el-table-column>
-        <el-table-column prop="pieceQty" label="累计件数" width="100"><template #default="{row}">{{ row.pieceQty ?? '-' }}</template></el-table-column>
-        <el-table-column label="已用寿命" min-width="100"><template #default="{row}">{{ valueText(row.usedLifeValue,row.lifeMetric) }}</template></el-table-column>
-        <el-table-column label="比例" width="80"><template #default="{row}">{{ row.usedPercent == null ? '-' : row.usedPercent+'%' }}</template></el-table-column>
+        <el-table-column label="采集时间" width="150"><template #default="{row}">{{ formatTime(row.collectedAt) }}</template></el-table-column>
+        <el-table-column label="来源" width="80"><template #default="{row}">{{ sourceText(row.source) }}</template></el-table-column>
+        <el-table-column label="主导口径" width="98"><template #default="{row}">{{ metricText(row.lifeMetric) }}</template></el-table-column>
+        <el-table-column prop="runningHours" label="累计小时" width="80"><template #default="{row}">{{ row.runningHours ?? '-' }}</template></el-table-column>
+        <el-table-column prop="taskCount" label="累计任务" width="80"><template #default="{row}">{{ row.taskCount ?? '-' }}</template></el-table-column>
+        <el-table-column prop="pieceQty" label="累计件数" width="80"><template #default="{row}">{{ row.pieceQty ?? '-' }}</template></el-table-column>
+        <el-table-column label="已用寿命" min-width="90"><template #default="{row}">{{ valueText(row.usedLifeValue,row.lifeMetric) }}</template></el-table-column>
+        <el-table-column label="比例" width="62"><template #default="{row}">{{ row.usedPercent == null ? '-' : row.usedPercent+'%' }}</template></el-table-column>
       </el-table>
-    </el-dialog>
+      </div>
+    </el-drawer>
   </div>
 </template>
 
@@ -217,6 +223,7 @@ const rows=ref([]),total=ref(0),loading=ref(false),refreshingId=ref(null),refres
 const statusOptions=[{value:'IN_USE',label:'使用中'},{value:'NEAR_DUE',label:'寿命临近'},{value:'DUE',label:'已到寿命'},{value:'BASELINE_PENDING',label:'待补基准'},{value:'NOT_TRACKED',label:'不计算'},{value:'RETURNED',label:'已全部退回'},{value:'CLOSED',label:'已结束'}]
 async function load(){loading.value=true;try{const r=await usageApi.list({keyword:filters.keyword.trim()||undefined,status:filters.status||undefined,page:page.page-1,size:page.size});rows.value=r.content||[];total.value=r.totalElements||0}finally{loading.value=false}}
 function search(){page.page=1;load()} function reset(){filters.keyword='';filters.status='';search()}
+const detailTitle = computed(() => current.value ? `${current.value.usageNo} · ${current.value.productName}` : '备件使用详情')
 async function showDetail(id){[current.value,history.value]=await Promise.all([usageApi.detail(id),usageApi.snapshots(id)]);detailVisible.value=true}
 async function refreshOne(row){refreshingId.value=row.id;try{await usageApi.refresh(row.id);ElMessage.success('寿命数据已刷新并保存快照');await load();if(current.value?.id===row.id)await showDetail(row.id)}finally{refreshingId.value=null}}
 async function refreshAll(){refreshingAll.value=true;try{const r=await usageApi.refreshAll();ElMessage.success(`刷新完成：成功 ${r.success} 条，失败 ${r.failed} 条`);await load()}finally{refreshingAll.value=false}}
@@ -284,7 +291,10 @@ onMounted(load)
 .replace-hint.is-overdue{color:#f56c6c}
 .forecast-note{margin-left:8px;color:#909399;font-size:12px}
 .multi-hint{display:block;color:#b0b8c4;font-size:11px;line-height:1.5}
-@media(max-width:767px){.filter-bar{display:grid;grid-template-columns:1fr 1fr}.filter-bar .el-input,.filter-bar .el-select{width:100%!important}.pagination{overflow-x:auto}:deep(.el-dialog){width:95%!important}}
+/* 详情抽屉：与设备管理详情保持一致的排版留白 */
+.usage-detail{padding: 0 4px}
+.usage-table :deep(.el-table__row){cursor:pointer}
+@media(max-width:767px){.filter-bar{display:grid;grid-template-columns:1fr 1fr}.filter-bar .el-input,.filter-bar .el-select{width:100%!important}.pagination{overflow-x:auto}}
 
 /* ---------- 移动端 ---------- */
 .m-page { background: transparent; padding: 0 0 12px; box-shadow: none; border: 0; border-radius: 0; min-height: auto; }

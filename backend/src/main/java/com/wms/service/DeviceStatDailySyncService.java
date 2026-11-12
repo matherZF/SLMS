@@ -17,6 +17,7 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -29,6 +30,8 @@ import java.util.Map;
 public class DeviceStatDailySyncService {
     private static final String INTERFACE_CODE = "DEVICE_STAT_DAILY_SYNC";
     private static final String INTERFACE_NAME = "设备每日运行数据同步";
+    /** 响应报文里最多保留多少行明细（正常一天几十行，超量说明源库口径有问题） */
+    private static final int DETAIL_LIMIT = 300;
     private static final String UPSERT_SQL =
             "insert into wms_device_stat_daily "
                     + "(stat_date, source_sys, device_type, device_code, running_hours, task_count, total_qty, collected_at, updated_at) "
@@ -207,9 +210,32 @@ public class DeviceStatDailySyncService {
         });
     }
 
+    /**
+     * 响应报文只写条数没法排查问题（同步成功但数字不对时看不出是哪台设备错了），
+     * 这里把逐行明细一并写进去：设备类型/编码 + 时长/任务数/件数。
+     * 明细超过 {@link #DETAIL_LIMIT} 行时只保留前若干条并打标，避免单条日志过大。
+     */
     private String summary(List<Row> rows) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("count", rows.size());
+        List<Map<String, Object>> details = new ArrayList<>();
+        for (int i = 0; i < rows.size() && i < DETAIL_LIMIT; i++) {
+            Row row = rows.get(i);
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("deviceType", row.deviceType());
+            item.put("deviceCode", row.deviceCode());
+            item.put("runningHours", row.runningHours());
+            item.put("taskCount", row.taskCount());
+            item.put("totalQty", row.totalQty());
+            details.add(item);
+        }
+        body.put("rows", details);
+        if (rows.size() > DETAIL_LIMIT) {
+            body.put("rowsTruncated", true);
+            body.put("rowsNote", "明细仅保留前 " + DETAIL_LIMIT + " 条，全部数据已入库");
+        }
         try {
-            return objectMapper.writeValueAsString(Map.of("count", rows.size(), "rows", rows.size() > 20 ? List.of() : rows));
+            return objectMapper.writeValueAsString(body);
         } catch (Exception e) {
             return "count=" + rows.size();
         }

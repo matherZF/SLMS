@@ -1,6 +1,6 @@
 <template>
-  <div class="page-container" :class="{ 'm-page': isMobile }">
-    <el-page-header v-if="!isMobile" :content="null" @back="$router.back()" style="margin-bottom: 12px">
+  <div :class="[embedded ? 'detail-embedded' : 'page-container', { 'm-page': isMobile }]">
+    <el-page-header v-if="!isMobile && !embedded" :content="null" @back="$router.back()" style="margin-bottom: 12px">
       <template #content><span style="font-size: 18px; font-weight: 600">领用单详情</span></template>
     </el-page-header>
 
@@ -160,7 +160,7 @@
           </el-button>
           <el-button v-if="detail.status === 'REJECTED' && auth.can('outbound:create')" @click="resubmitOrder">重新提交</el-button>
           <el-button v-if="detail.status === 'PENDING_APPROVAL' || detail.status === 'APPROVED'" type="danger" plain @click="cancelOrder">取消申请</el-button>
-          <el-button @click="$router.back()"><el-icon><ArrowLeft /></el-icon>&nbsp;返回列表</el-button>
+          <el-button @click="handleBack"><el-icon><ArrowLeft /></el-icon>&nbsp;返回列表</el-button>
         </div>
       </template>
       <el-empty v-else-if="!loading" description="单据不存在或已被删除" />
@@ -203,6 +203,16 @@ const router = useRouter()
 const auth = useAuthStore()
 const { isMobile } = useMobile()
 
+/**
+ * 同一个组件两用：路由页（/outbound/:id）与列表页右侧抽屉。
+ * 抽屉里传 orderId + embedded，隐藏页头返回条，“返回列表”改为关闭抽屉。
+ */
+const props = defineProps({
+  orderId: { type: [String, Number], default: null },
+  embedded: { type: Boolean, default: false }
+})
+const emit = defineEmits(['close', 'changed'])
+
 const detail = ref(null)
 const loading = ref(false)
 const returnDialogVisible = ref(false)
@@ -226,7 +236,7 @@ const detailEquipmentText = computed(() => {
 })
 
 async function loadDetail() {
-  const id = route.params.id
+  const id = props.orderId ?? route.params.id
   if (!id) return
   loading.value = true
   try {
@@ -234,6 +244,11 @@ async function loadDetail() {
   } finally {
     loading.value = false
   }
+}
+
+function handleBack() {
+  if (props.embedded) emit('close')
+  else router.back()
 }
 
 function statusText(s) {
@@ -278,6 +293,7 @@ async function resubmitOrder() {
   await outboundApi.resubmit(detail.value.id)
   ElMessage.success('已重新提交审批')
   loadDetail()
+  emit('changed')
 }
 
 async function cancelOrder() {
@@ -286,6 +302,7 @@ async function cancelOrder() {
     await outboundApi.cancel(detail.value.id, value || '')
     ElMessage.success('领用单已取消')
     loadDetail()
+    emit('changed')
   } catch (e) {
     if (e !== 'cancel' && e !== 'close') throw e
   }
@@ -318,6 +335,7 @@ async function submitReturn() {
     ElMessage.success(`退库申请已提交审批：${result.returnNo}`)
     returnDialogVisible.value = false
     await loadDetail()
+    emit('changed')
   } finally {
     returnSubmitting.value = false
   }
@@ -338,6 +356,12 @@ onMounted(loadDetail)
 
 <style scoped lang="scss">
 // ---------- 详情页通用（入库/出库单详情统一风格） ----------
+// 抽屉内嵌：去掉页面容器的白卡与内边距
+.detail-embedded {
+  padding: 0;
+  .card-d { margin: 0 0 12px; }
+  .footer-actions { margin: 16px 0 0; }
+}
 .m-page {
   background: transparent;
   padding: 0 0 12px;

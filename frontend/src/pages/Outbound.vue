@@ -1,6 +1,9 @@
 <template>
   <div class="page-container" :class="{ 'm-page': isMobile }">
-    <PageHeader v-if="!isMobile">出库管理</PageHeader>
+    <PageHeader v-if="!isMobile">
+      出库管理
+      <template #desc>领用单申请与审批跟踪；双击单据行可直接打开详情</template>
+    </PageHeader>
 
     <!-- 快捷入口：移动端宫格 / 桌面端大卡 -->
     <section v-if="isMobile" class="m-grid card-m">
@@ -96,7 +99,9 @@
       :data="list"
       stripe
       border
+      class="order-table"
       style="width: 100%"
+      @row-dblclick="row => viewDetail(row)"
     >
       <el-table-column prop="orderNo" label="领用单号" min-width="170" />
       <el-table-column prop="department" label="领用部门" min-width="120" />
@@ -148,6 +153,12 @@
         @current-change="loadData"
       />
     </div>
+
+    <!-- 详情抽屉：桌面端原地弹出，移动端仍走详情页 -->
+    <el-drawer v-model="detailVisible" direction="rtl" size="880px" :title="detailTitle" destroy-on-close>
+      <OutboundDetail v-if="detailId" :key="detailId" :order-id="detailId" embedded
+                      @close="detailVisible = false" @changed="loadData" />
+    </el-drawer>
 
     <!-- 新建领用单 Dialog -->
     <el-dialog
@@ -269,6 +280,7 @@ import { reactive, ref, onMounted, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import PageHeader from '@/components/PageHeader.vue'
+import OutboundDetail from '@/pages/OutboundDetail.vue'
 import * as outboundApi from '@/api/outbound'
 import * as productsApi from '@/api/products'
 import * as inventoryApi from '@/api/inventory'
@@ -309,6 +321,13 @@ const total = ref(0)
 const loading = ref(false)
 
 const createDialogVisible = ref(false)
+// 详情抽屉（桌面端）；移动端仍走详情页
+const detailVisible = ref(false)
+const detailId = ref(null)
+const detailTitle = computed(() => {
+  const row = list.value.find(r => r.id === detailId.value)
+  return row?.orderNo ? `领用单 ${row.orderNo}` : '领用单详情'
+})
 const submitting = ref(false)
 const productsLoading = ref(false)
 const productList = ref([])
@@ -615,7 +634,12 @@ function goInventory() {
 }
 
 function viewDetail(row) {
-  router.push(`/outbound/${row.id}`)
+  if (isMobile.value) {
+    router.push(`/outbound/${row.id}`)
+    return
+  }
+  detailId.value = row.id
+  detailVisible.value = true
 }
 
 async function resubmitOrder(row) {
@@ -938,4 +962,7 @@ onMounted(loadData)
 @media(min-width:768px){
   .pager{justify-content:flex-end}
 }
+
+// 双击行可打开详情，行上给手型提示
+.order-table :deep(.el-table__row){cursor:pointer}
 </style>

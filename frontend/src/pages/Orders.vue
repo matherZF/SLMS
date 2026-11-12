@@ -1,6 +1,9 @@
 <template>
   <div class="page-container" :class="{ 'm-page': isMobile }">
-    <PageHeader v-if="!isMobile">入库管理</PageHeader>
+    <PageHeader v-if="!isMobile">
+      入库管理
+      <template #desc>到货登记与上架跟踪；双击单据行可直接打开详情</template>
+    </PageHeader>
 
     <!-- 快捷入口：移动端宫格 / 桌面端大卡 -->
     <section v-if="isMobile" class="m-grid card-m">
@@ -102,7 +105,9 @@
       :data="list"
       stripe
       border
+      class="order-table"
       style="width: 100%"
+      @row-dblclick="row => goDetail(row)"
     >
       <el-table-column prop="orderNo" label="单号" min-width="170" />
       <el-table-column label="货品" min-width="220">
@@ -160,6 +165,11 @@
       />
     </div>
 
+    <!-- 详情抽屉：桌面端原地弹出，移动端仍走详情页 -->
+    <el-drawer v-model="detailVisible" direction="rtl" size="820px" :title="detailTitle" destroy-on-close>
+      <OrderDetail v-if="detailId" :key="detailId" :order-id="detailId" embedded @close="detailVisible = false" />
+    </el-drawer>
+
     <!-- 新建单 Dialog -->
     <CreateOrderDialog
       v-model="createDialogVisible"
@@ -173,6 +183,7 @@ import { reactive, ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import PageHeader from '@/components/PageHeader.vue'
 import CreateOrderDialog from '@/components/CreateOrderDialog.vue'
+import OrderDetail from '@/pages/OrderDetail.vue'
 import * as ordersApi from '@/api/orders'
 import { useAuthStore } from '@/stores/auth'
 import { useMobile } from '@/composables/useMobile'
@@ -202,6 +213,13 @@ const total = ref(0)
 const loading = ref(false)
 
 const createDialogVisible = ref(false)
+// 详情抽屉（桌面端）；移动端沿用详情页，避免窄屏塞两个列表
+const detailVisible = ref(false)
+const detailId = ref(null)
+const detailTitle = computed(() => {
+  const row = list.value.find(r => r.id === detailId.value)
+  return row?.orderNo ? `入库单 ${row.orderNo}` : '入库单详情'
+})
 
 async function loadData() {
   loading.value = true
@@ -251,7 +269,12 @@ function onCreateSuccess() {
 }
 
 function goDetail(row) {
-  router.push(`/orders/${row.id}`)
+  if (isMobile.value) {
+    router.push(`/orders/${row.id}`)
+    return
+  }
+  detailId.value = row.id
+  detailVisible.value = true
 }
 
 function goPutaway() {
@@ -474,4 +497,7 @@ onMounted(loadData)
 @media(min-width:768px){
   .pager{justify-content:flex-end}
 }
+
+// 双击行可打开详情，行上给手型提示
+.order-table :deep(.el-table__row){cursor:pointer}
 </style>

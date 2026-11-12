@@ -22,6 +22,8 @@ public class InterfaceLogService {
     public static final String INBOUND = "INBOUND";
     public static final String OUTBOUND = "OUTBOUND";
     private static final int MAX_PAYLOAD = 10000;
+    /** 响应报文上限单独放宽：设备每日运行数据同步等接口会把逐行明细写进响应，1 万字符装不下 */
+    private static final int MAX_RESPONSE_PAYLOAD = 60000;
     private static final Logger log = LoggerFactory.getLogger(InterfaceLogService.class);
 
     private final InterfaceLogRepository repository;
@@ -42,7 +44,7 @@ public class InterfaceLogService {
             item.setChannel(channel);
             item.setPeer(peer);
             item.setRequestBody(truncate(requestBody));
-            item.setResponseBody(truncate(responseBody));
+            item.setResponseBody(truncate(responseBody, MAX_RESPONSE_PAYLOAD));
             item.setSuccess(success);
             item.setErrorMessage(truncate(errorMessage, 500));
             item.setTraceId(traceId);

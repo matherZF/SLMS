@@ -1,8 +1,8 @@
 <template>
-  <div class="page-container" :class="{ 'm-page': isMobile }">
-    <!-- 返回头部：桌面端显示，移动端由 AppLayout 顶栏返回箭头承担 -->
+  <div :class="[embedded ? 'detail-embedded' : 'page-container', { 'm-page': isMobile }]">
+    <!-- 返回头部：桌面端显示，移动端由 AppLayout 顶栏返回箭头承担；抽屉内不再显示 -->
     <el-page-header
-      v-if="!isMobile"
+      v-if="!isMobile && !embedded"
       :content="null"
       @back="$router.back()"
       style="margin-bottom: 12px"
@@ -100,7 +100,7 @@
       >
         <el-icon><Check /></el-icon>&nbsp;继续上架
       </el-button>
-      <el-button @click="$router.back()">
+      <el-button @click="handleBack">
         <el-icon><ArrowLeft /></el-icon>&nbsp;返回列表
       </el-button>
     </div>
@@ -117,6 +117,16 @@ const route = useRoute()
 const router = useRouter()
 const { isMobile } = useMobile()
 
+/**
+ * 同一个组件两用：路由页（/orders/:id）与列表页右侧抽屉。
+ * 抽屉里传 orderId + embedded，隐藏页头返回条，“返回列表”改为关闭抽屉。
+ */
+const props = defineProps({
+  orderId: { type: [String, Number], default: null },
+  embedded: { type: Boolean, default: false }
+})
+const emit = defineEmits(['close'])
+
 const detail = ref(null)
 const loading = ref(false)
 
@@ -126,7 +136,7 @@ const remainingQty = computed(() => {
 })
 
 async function loadDetail() {
-  const id = route.params.id
+  const id = props.orderId ?? route.params.id
   if (!id) return
   loading.value = true
   try {
@@ -134,6 +144,11 @@ async function loadDetail() {
   } finally {
     loading.value = false
   }
+}
+
+function handleBack() {
+  if (props.embedded) emit('close')
+  else router.back()
 }
 
 function goPutaway() {
@@ -179,6 +194,12 @@ onMounted(loadDetail)
   border-radius: 14px;
   padding: 14px;
   box-shadow: 0 2px 10px rgba(30, 60, 120, .05);
+}
+// 抽屉内嵌：去掉页面容器的白卡与内边距，卡片改为上下排布
+.detail-embedded {
+  padding: 0;
+  .card-d { margin: 0 0 12px; }
+  .footer-actions { margin: 16px 0 0; }
 }
 .card-title {
   font-size: 15px;
