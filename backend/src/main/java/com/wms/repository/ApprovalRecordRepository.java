@@ -6,7 +6,7 @@ import org.springframework.data.jpa.repository.*;
 import org.springframework.data.repository.query.Param;
 import java.util.*;
 
-public interface ApprovalRecordRepository extends JpaRepository<ApprovalRecord, Long> {
+public interface ApprovalRecordRepository extends JpaRepository<ApprovalRecord, Long>, JpaSpecificationExecutor<ApprovalRecord> {
     List<ApprovalRecord> findByBusinessTypeAndBusinessIdOrderByRoundNoAscIdAsc(String businessType, Long businessId);
     List<ApprovalRecord> findByStatusOrderBySubmittedAtAsc(ApprovalStatus status);
     @Lock(LockModeType.PESSIMISTIC_WRITE)

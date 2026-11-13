@@ -38,13 +38,18 @@ public class ApprovalService {
     public record WorkflowContext(Set<String> categories,int totalQty,BigDecimal totalAmount){}
     private record MatchResult(boolean matched,String reason){}
 
+    /**
+     * 通用提交入口（退库 RETURN / 报废 SCRAP / 盘点差异 STOCKTAKE_DIFF 等经此进入）。
+     * 没有启用中的流程（未配置或已停用）时与领用（submitOutbound）保持同一语义：系统自动放行，
+     * 而不是再建一张无人审批的兜底单——停用流程本意就是"这类业务不再需要审批"。
+     */
     public ApprovalRecord submit(String type, Long id, String no, String applicant) {
         List<ApprovalRecord> history = repo.findByBusinessTypeAndBusinessIdOrderByRoundNoAscIdAsc(type, id);
         if (history.stream().anyMatch(a -> a.getStatus() == ApprovalStatus.PENDING)) throw new BizException("该单据已有待处理审批");
         int round=history.stream().mapToInt(ApprovalRecord::getRoundNo).max().orElse(0)+1;
         var workflow=workflowRepo.findFirstByBusinessTypeAndEnabledTrueOrderByVersionDesc(type);
         if(workflow.isPresent()&&!workflow.get().getNodes().isEmpty())return createAndAdvance(type,id,no,applicant,round,workflow.get(),0,"流程固定触发");
-        return create(type,id,no,applicant,round,null,null);
+        return createAutoDecision(type,id,no,applicant,round,"未配置启用的审批流程，系统自动放行");
     }
 
     /** 领用条件不命中时返回 null，表示无需审批；命中后自动跳过与申请人身份相同的节点。 */
@@ -62,10 +67,12 @@ public class ApprovalService {
         ApprovalRecord a = current(type, id);
         if (a.getApplicant().equalsIgnoreCase(approver)) throw new BizException("申请人与审批人不能为同一人");
         var user=userRepo.findByUsername(approver).orElseThrow(()->new BizException("审批用户不存在"));
-        if(a.getApproverType()!=null){boolean assigned="USER".equals(a.getApproverType())?approver.equals(a.getApproverValue()):user.getRole().equals(a.getApproverValue());if(!assigned)throw new BizException("当前审批节点未分配给你");}
-        // 没有 approverType 的记录来自"流程未配置/被停用"时的兜底建单（见 submit），
+        if(a.getApproverType()!=null){boolean assigned="USER".equals(a.getApproverType())?approver.equals(a.getApproverValue()):user.getRole().equals(a.getApproverValue());
+            // 管理员不受流程节点分配限制：不管流程配置谁审批，管理员都能处理（申请人本人除外，内控红线）
+            if(!assigned&&!isAdmin(user))throw new BizException("当前审批节点未分配给你");}
+        // 没有 approverType 的记录来自旧版"流程未配置/被停用"时的兜底建单（历史数据），
         // 这种记录没有指定审批人，若不额外限制，任何登录用户都能审批任意申请。
-        else if(!permissionsOf(user).contains(APPROVE_AUTHORITY)) throw new BizException("当前审批节点未分配审批人，需具备业务审批权限才能处理");
+        else if(!isAdmin(user)&&!permissionsOf(user).contains(APPROVE_AUTHORITY)) throw new BizException("当前审批节点未分配审批人，需具备业务审批权限才能处理");
         if (!approved && !StringUtils.hasText(opinion)) throw new BizException("驳回时必须填写审批意见");
         a.setApprover(approver); a.setStatus(approved ? ApprovalStatus.APPROVED : ApprovalStatus.REJECTED);
         a.setOpinion(StringUtils.hasText(opinion) ? opinion.trim() : "审批通过"); a.setHandledAt(Instant.now()); repo.save(a);
@@ -82,19 +89,68 @@ public class ApprovalService {
 
     @Transactional(readOnly = true)
     public List<ApprovalRecordVO> list(String type, Long id) {
-        return repo.findByBusinessTypeAndBusinessIdOrderByRoundNoAscIdAsc(type,id).stream().map(a ->
-                new ApprovalRecordVO(a.getId(),a.getBusinessType(),a.getBusinessId(),a.getBusinessNo(),a.getRoundNo(),
-                            a.getApplicant(),a.getApprover(),a.getStatus().name(),a.getOpinion(),a.getSubmittedAt(),a.getHandledAt(),a.getNodeSequence(),a.getNodeName(),a.getApproverType(),a.getApproverValue(),a.getWorkflowVersion(),a.getMatchReason())).toList();
+        return repo.findByBusinessTypeAndBusinessIdOrderByRoundNoAscIdAsc(type,id).stream().map(this::toVO).toList();
     }
+
+    private ApprovalRecordVO toVO(ApprovalRecord a) {
+        return new ApprovalRecordVO(a.getId(),a.getBusinessType(),a.getBusinessId(),a.getBusinessNo(),a.getRoundNo(),
+                a.getApplicant(),a.getApprover(),a.getStatus().name(),a.getOpinion(),a.getSubmittedAt(),a.getHandledAt(),a.getNodeSequence(),a.getNodeName(),a.getApproverType(),a.getApproverValue(),a.getWorkflowVersion(),a.getMatchReason());
+    }
+
+    /**
+     * 已办结审批历史（审批中心"已办结"页签）：只含非 PENDING 记录，按提交时间倒序分页。
+     * 可见范围：管理员看全系统；普通用户只看自己审批过的 + 自己申请的。
+     * 同一单据多节点/多轮会按记录逐行展示，真实反映流转过程。
+     */
+    @Transactional(readOnly=true)
+    public org.springframework.data.domain.Page<ApprovalRecordVO> history(String viewer,String type,String status,String keyword,int page,int size){
+        User u=userRepo.findByUsername(viewer).orElseThrow(()->new BizException("用户不存在"));
+        boolean admin=isAdmin(u);
+        ApprovalStatus statusFilter=null;
+        if(status!=null&&!status.isBlank()&&!"ALL".equals(status)){
+            try{statusFilter=ApprovalStatus.valueOf(status);}catch(IllegalArgumentException e){throw new BizException("未知的审批状态："+status);}
+            if(statusFilter==ApprovalStatus.PENDING)statusFilter=null;
+        }
+        var pageable=org.springframework.data.domain.PageRequest.of(Math.max(page,0),Math.min(Math.max(size,1),100),
+                org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC,"submittedAt","id"));
+        final ApprovalStatus sf=statusFilter;
+        var spec=new org.springframework.data.jpa.domain.Specification<ApprovalRecord>(){
+            @Override public jakarta.persistence.criteria.Predicate toPredicate(jakarta.persistence.criteria.Root<ApprovalRecord> root,
+                    jakarta.persistence.criteria.CriteriaQuery<?> q, jakarta.persistence.criteria.CriteriaBuilder cb){
+                var ps=new java.util.ArrayList<jakarta.persistence.criteria.Predicate>();
+                ps.add(cb.notEqual(root.get("status"),ApprovalStatus.PENDING));
+                if(type!=null&&!type.isBlank())ps.add(cb.equal(root.get("businessType"),type));
+                if(sf!=null)ps.add(cb.equal(root.get("status"),sf));
+                if(keyword!=null&&!keyword.isBlank()){
+                    String like="%"+keyword.trim()+"%";
+                    ps.add(cb.or(cb.like(root.get("businessNo"),like),cb.like(root.get("applicant"),like),
+                            cb.like(cb.coalesce(root.get("approver"),""),like)));
+                }
+                if(!admin)ps.add(cb.or(cb.equal(cb.lower(root.get("approver")),viewer.toLowerCase()),
+                        cb.equal(cb.lower(root.get("applicant")),viewer.toLowerCase())));
+                return cb.and(ps.toArray(new jakarta.persistence.criteria.Predicate[0]));
+            }
+        };
+        return repo.findAll(spec,pageable).map(this::toVO);
+    }
+
     private ApprovalRecord current(String type, Long id) {
         List<ApprovalRecord> rows=repo.findCurrentForUpdate(type,id,ApprovalStatus.PENDING);
         if (rows.isEmpty()) throw new BizException("未找到待处理的审批记录");
         return rows.get(0);
     }
     @Transactional(readOnly=true) public boolean canHandle(String type,Long id,String username){var rows=repo.findByBusinessTypeAndBusinessIdOrderByRoundNoAscIdAsc(type,id);var a=rows.stream().filter(x->x.getStatus()==ApprovalStatus.PENDING).reduce((x,y)->y).orElse(null);if(a==null)return false;var u=userRepo.findByUsername(username).orElse(null);if(u==null||a.getApplicant().equalsIgnoreCase(username))return false;
-        // 无指定审批人的记录（流程未配置/被停用）只能由持有业务审批权限的人处理，否则任务列表会把它推给所有人
+        // 管理员拥有全部审批权：不管流程节点配置的是谁，任务列表都对管理员可见、可处理
+        if(isAdmin(u))return true;
+        // 无指定审批人的记录（旧版兜底建单）只能由持有业务审批权限的人处理，否则任务列表会把它推给所有人
         if(a.getApproverType()==null)return permissionsOf(u).contains(APPROVE_AUTHORITY);
         return "USER".equals(a.getApproverType())?username.equals(a.getApproverValue()):u.getRole().equals(a.getApproverValue());}
+
+    /**
+     * 管理员判定：与 UserService 的护栏同一口径——同时持有「用户管理」和「角色管理」
+     * 两个权限码即视为管理员账号，而不是写死角色编码。这样即使另建等权角色同样生效。
+     */
+    private boolean isAdmin(User user){var p=permissionsOf(user);return p.contains("system:user")&&p.contains("system:role");}
 
     /** 取用户所属角色的权限码集合；角色不存在（历史脏数据）时返回空集合，取最保守的结果 */
     private Set<String> permissionsOf(User user){

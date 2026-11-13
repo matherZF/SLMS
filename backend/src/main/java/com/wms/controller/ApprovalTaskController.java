@@ -32,6 +32,19 @@ public class ApprovalTaskController {
         return Result.ok(approvals.tasks(auth.getName()));
     }
 
+    /** 已办结审批历史：管理员看全部，普通用户看自己审批过的 + 自己申请的。 */
+    @GetMapping("/history")
+    @PreAuthorize("hasAuthority('page:approval')")
+    public Result<org.springframework.data.domain.Page<com.wms.dto.ApprovalRecordVO>> history(
+            @RequestParam(required = false) String type,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            Authentication auth) {
+        return Result.ok(approvals.history(auth.getName(), type, status, keyword, page, size));
+    }
+
     @PostMapping("/{type}/{id}/approve")
     @PreAuthorize("hasAuthority('outbound:approve')")
     public Result<Map<String, Object>> approve(@PathVariable String type, @PathVariable Long id,

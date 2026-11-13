@@ -1,8 +1,8 @@
 <template>
   <div class="page-container approval-page" :class="{ 'm-page': isMobile }">
-    <PageHeader v-if="!isMobile">统一审批中心<template #desc>集中处理领用、退库、报废与盘点差异复核任务</template><template #actions><el-button :loading="loading" @click="load"><el-icon><Refresh /></el-icon>&nbsp;刷新</el-button></template></PageHeader>
+    <PageHeader v-if="!isMobile">统一审批中心<template #desc>集中处理领用、退库、报废与盘点差异复核任务；已办结记录可切换「已办结」查看</template><template #actions><el-button :loading="loading" @click="viewMode==='pending'?load():loadDone()"><el-icon><Refresh /></el-icon>&nbsp;刷新</el-button></template></PageHeader>
 
-    <section v-if="!isMobile" class="approval-overview">
+    <section v-if="!isMobile && viewMode==='pending'" class="approval-overview">
       <button v-for="item in overview" :key="item.value" class="metric-card" :class="{ active: filter === item.value }" @click="filter=item.value">
         <span class="metric-icon" :class="item.class"><el-icon><component :is="item.icon" /></el-icon></span>
         <span><strong>{{ item.count }}</strong><small>{{ item.label }}</small></span>
@@ -13,23 +13,44 @@
     <div v-if="isMobile" class="m-filter card-m">
       <div class="m-chips-row">
         <button
+          v-for="x in viewOptions"
+          :key="x.value"
+          class="m-chip-btn"
+          :class="{ on: viewMode === x.value }"
+          @click="switchView(x.value)"
+        >{{ x.label }}</button>
+        <span class="m-icon-btn" @click="viewMode==='pending'?load():loadDone()"><el-icon :class="{ spinning: loading || doneLoading }"><Refresh /></el-icon></span>
+      </div>
+      <div v-if="viewMode==='pending'" class="m-chips-row">
+        <button
           v-for="x in filterOptions"
           :key="x.value"
           class="m-chip-btn"
           :class="{ on: filter === x.value }"
           @click="filter = x.value"
         >{{ x.label }}</button>
-        <span class="m-icon-btn" @click="load"><el-icon :class="{ spinning: loading }"><Refresh /></el-icon></span>
       </div>
-      <div class="m-count">共 {{ filteredRows.length }} 项需要处理</div>
+      <div class="m-count">{{ viewMode==='pending' ? `共 ${filteredRows.length} 项需要处理` : `共 ${doneTotal} 条已办结记录` }}</div>
     </div>
 
     <div v-if="!isMobile" class="task-toolbar">
-      <div><b>{{ filter === 'ALL' ? '全部待办' : typeMeta(filter).label }}</b><span>共 {{ filteredRows.length }} 项需要处理</span></div>
-      <el-segmented v-model="filter" :options="filterOptions" />
+      <div><b>{{ viewMode==='pending' ? (filter === 'ALL' ? '全部待办' : typeMeta(filter).label) : (filter === 'ALL' ? '已办结审批' : typeMeta(filter).label + ' · 已办结') }}</b><span>{{ viewMode==='pending' ? `共 ${filteredRows.length} 项需要处理` : `共 ${doneTotal} 条记录` }}</span></div>
+      <div class="toolbar-right">
+        <template v-if="viewMode==='done'">
+          <el-select v-model="doneFilters.status" style="width: 120px" @change="loadDone(1)">
+            <el-option label="全部结果" value="ALL" />
+            <el-option label="通过" value="APPROVED" />
+            <el-option label="驳回" value="REJECTED" />
+            <el-option label="已取消" value="CANCELLED" />
+          </el-select>
+          <el-input v-model="doneFilters.keyword" placeholder="单号 / 申请人 / 审批人" clearable style="width: 210px" @keyup.enter="loadDone(1)" @clear="loadDone(1)" />
+        </template>
+        <el-segmented v-model="viewMode" :options="viewOptions" @change="v => v==='done' && loadDone(1)" />
+        <el-segmented v-if="viewMode==='pending'" v-model="filter" :options="filterOptions" />
+      </div>
     </div>
 
-    <el-table v-if="!isMobile" v-loading="loading" :data="filteredRows" stripe class="task-table">
+    <el-table v-if="!isMobile && viewMode==='pending'" v-loading="loading" :data="filteredRows" stripe class="task-table">
       <el-table-column label="业务" min-width="230"><template #default="{row}"><div class="business-cell"><span class="business-mark" :class="typeMeta(row.businessType).class"><el-icon><component :is="typeMeta(row.businessType).icon" /></el-icon></span><div><b>{{typeMeta(row.businessType).label}}</b><small>{{row.businessNo}}</small></div></div></template></el-table-column>
       <el-table-column prop="applicant" label="申请人" width="120" />
       <el-table-column label="流程版本" width="100"><template #default="{row}">{{row.workflowVersion ? `V${row.workflowVersion}` : '系统判定'}}</template></el-table-column>
@@ -39,14 +60,44 @@
       <el-table-column label="操作" width="180" fixed="right"><template #default="{row}"><el-button type="primary" plain size="small" @click="openReview(row,true)">通过</el-button><el-button type="danger" plain size="small" @click="openReview(row,false)">驳回</el-button></template></el-table-column>
     </el-table>
 
-    <div v-else v-loading="loading" class="mobile-tasks">
+    <!-- 已办结：桌面表格 -->
+    <template v-if="!isMobile && viewMode==='done'">
+      <el-table v-loading="doneLoading" :data="doneRows" stripe class="task-table" @row-dblclick="row => showDoneDetail(row)">
+        <el-table-column label="业务" min-width="220"><template #default="{row}"><div class="business-cell"><span class="business-mark" :class="typeMeta(row.businessType).class"><el-icon><component :is="typeMeta(row.businessType).icon" /></el-icon></span><div><b>{{typeMeta(row.businessType).label}}</b><small>{{row.businessNo}}</small></div></div></template></el-table-column>
+        <el-table-column label="节点" min-width="130"><template #default="{row}"><span v-if="row.nodeName">{{ row.nodeName }}<small v-if="row.roundNo" class="round-no"> · 第{{ row.roundNo }}轮</small></span><span v-else class="done-dim">-</span></template></el-table-column>
+        <el-table-column prop="applicant" label="申请人" width="110" />
+        <el-table-column label="审批人" width="110"><template #default="{row}">{{ row.approver === 'SYSTEM' ? '系统自动' : (row.approver || '-') }}</template></el-table-column>
+        <el-table-column label="结果" width="100" align="center"><template #default="{row}"><el-tag size="small" :type="doneTag(row).type">{{ doneTag(row).label }}</el-tag></template></el-table-column>
+        <el-table-column label="审批意见" min-width="200" show-overflow-tooltip><template #default="{row}">{{ row.opinion || '-' }}</template></el-table-column>
+        <el-table-column label="提交时间" width="165"><template #default="{row}">{{ formatTime(row.submittedAt) }}</template></el-table-column>
+        <el-table-column label="处理时间" width="165"><template #default="{row}">{{ formatTime(row.handledAt) }}</template></el-table-column>
+      </el-table>
+      <div class="done-pager">
+        <el-pagination layout="total, prev, pager, next, sizes" :total="doneTotal" :page-sizes="[20, 50, 100]" v-model:current-page="donePage" v-model:page-size="doneSize" @current-change="loadDone()" @size-change="loadDone(1)" />
+      </div>
+    </template>
+
+    <div v-if="isMobile && viewMode==='pending'" v-loading="loading" class="mobile-tasks">
       <article v-for="row in filteredRows" :key="`${row.businessType}-${row.businessId}`" class="mobile-task">
         <div class="mobile-head"><div class="business-cell"><span class="business-mark" :class="typeMeta(row.businessType).class"><el-icon><component :is="typeMeta(row.businessType).icon" /></el-icon></span><div><b>{{typeMeta(row.businessType).label}}</b><small>{{row.businessNo}}</small></div></div><span class="m-tag" :class="row.overdue ? 't-red' : 't-amber'">{{row.overdue?'已超时':'待处理'}}</span></div>
         <div class="mobile-info"><span>申请人 <b>{{row.applicant}}</b></span><span>流程版本 <b>{{row.workflowVersion?`V${row.workflowVersion}`:'系统判定'}}</b></span><span>当前节点 <b>{{row.nodeName||'审批'}}</b></span><span>已等待 <b>{{waitText(row.submittedAt)}}</b></span></div>
         <div class="mobile-actions"><el-button type="danger" plain @click="openReview(row,false)">驳回</el-button><el-button class="m-primary-btn" @click="openReview(row,true)">审批通过</el-button></div>
       </article>
     </div>
-    <el-empty v-if="!loading&&!filteredRows.length" description="当前分类暂无待审批任务" />
+
+    <!-- 已办结：移动端卡片 -->
+    <div v-if="isMobile && viewMode==='done'" v-loading="doneLoading" class="mobile-tasks">
+      <article v-for="row in doneRows" :key="row.id" class="mobile-task">
+        <div class="mobile-head"><div class="business-cell"><span class="business-mark" :class="typeMeta(row.businessType).class"><el-icon><component :is="typeMeta(row.businessType).icon" /></el-icon></span><div><b>{{typeMeta(row.businessType).label}}</b><small>{{row.businessNo}}</small></div></div><span class="m-tag" :class="doneTag(row).tone">{{ doneTag(row).label }}</span></div>
+        <div class="mobile-info"><span>申请人 <b>{{row.applicant}}</b></span><span>审批人 <b>{{ row.approver === 'SYSTEM' ? '系统自动' : (row.approver || '-') }}</b></span><span>节点 <b>{{ row.nodeName || '审批' }}</b></span><span>处理时间 <b>{{ formatTime(row.handledAt) }}</b></span></div>
+        <div v-if="row.opinion" class="done-opinion">{{ row.opinion }}</div>
+      </article>
+      <el-empty v-if="!doneLoading && !doneRows.length" description="暂无已办结审批" />
+      <div class="m-pager">
+        <el-pagination v-model:current-page="donePage" :page-size="doneSize" :total="doneTotal" layout="prev, pager, next" background @current-change="loadDone()" />
+      </div>
+    </div>
+    <el-empty v-if="viewMode==='pending' && !loading && !filteredRows.length" description="当前分类暂无待审批任务" />
 
     <el-dialog v-model="reviewVisible" :title="approved?'确认审批通过':'确认驳回申请'" :width="dialogWidth" destroy-on-close>
       <div v-if="selected" class="review-sheet">
@@ -138,11 +189,29 @@
       </div>
       <template #footer><el-button @click="reviewVisible=false">取消</el-button><el-button :type="approved?'primary':'danger'" :loading="submitting" @click="submitReview">{{approved?'确认通过':'确认驳回'}}</el-button></template>
     </el-dialog>
+
+    <!-- 已办结记录详情（只读） -->
+    <el-dialog v-model="doneVisible" title="审批记录详情" :width="dialogWidth">
+      <dl v-if="doneSelected" class="done-detail">
+        <div><dt>业务类型</dt><dd>{{ typeMeta(doneSelected.businessType).label }}</dd></div>
+        <div><dt>单号</dt><dd>{{ doneSelected.businessNo }}</dd></div>
+        <div><dt>审批节点</dt><dd>{{ doneSelected.nodeName || '审批' }}{{ doneSelected.roundNo ? `（第${doneSelected.roundNo}轮）` : '' }}</dd></div>
+        <div><dt>申请人</dt><dd>{{ doneSelected.applicant }}</dd></div>
+        <div><dt>审批人</dt><dd>{{ doneSelected.approver === 'SYSTEM' ? '系统自动' : (doneSelected.approver || '-') }}</dd></div>
+        <div><dt>结果</dt><dd>{{ doneTag(doneSelected).label }}</dd></div>
+        <div><dt>提交时间</dt><dd>{{ formatTime(doneSelected.submittedAt) }}</dd></div>
+        <div><dt>处理时间</dt><dd>{{ formatTime(doneSelected.handledAt) }}</dd></div>
+        <div v-if="doneSelected.workflowVersion"><dt>流程版本</dt><dd>V{{ doneSelected.workflowVersion }}</dd></div>
+        <div class="reason-row"><dt>条件判定</dt><dd>{{ doneSelected.matchReason || '-' }}</dd></div>
+        <div class="reason-row"><dt>审批意见</dt><dd>{{ doneSelected.opinion || '-' }}</dd></div>
+      </dl>
+      <template #footer><el-button type="primary" @click="doneVisible=false">关闭</el-button></template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { computed, ref, onMounted } from 'vue'
+import { computed, reactive, ref, watch, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import PageHeader from '@/components/PageHeader.vue'
 import * as approvalApi from '@/api/approvals'
@@ -159,6 +228,44 @@ const filterOptions=[{label:'全部',value:'ALL'},...Object.entries(types).map((
 const filteredRows=computed(()=>filter.value==='ALL'?rows.value:rows.value.filter(x=>x.businessType===filter.value))
 const overview=computed(()=>[{value:'ALL',label:'全部待办',class:'cyan',icon:'Stamp',count:rows.value.length},...Object.entries(types).map(([value,x])=>({...x,value,count:rows.value.filter(r=>r.businessType===value).length}))])
 
+// ---------- 已办结（历史） ----------
+const viewMode = ref('pending')
+const viewOptions = [{ label: '待办', value: 'pending' }, { label: '已办结', value: 'done' }]
+const doneRows = ref([]), doneTotal = ref(0), doneLoading = ref(false)
+const donePage = ref(1), doneSize = ref(20)
+const doneFilters = reactive({ status: 'ALL', keyword: '' })
+
+function doneTag(row) {
+  if (row.approver === 'SYSTEM' && row.status === 'APPROVED') return { label: '自动放行', type: 'info', tone: 't-gray' }
+  return { APPROVED: { label: '通过', type: 'success', tone: 't-green' }, REJECTED: { label: '驳回', type: 'danger', tone: 't-red' }, CANCELLED: { label: '已取消', type: 'info', tone: 't-gray' } }[row.status] || { label: row.status, type: 'info', tone: 't-gray' }
+}
+
+async function loadDone(page) {
+  if (page) donePage.value = page
+  doneLoading.value = true
+  try {
+    const r = await approvalApi.history({
+      type: filter.value === 'ALL' ? undefined : filter.value,
+      status: doneFilters.status,
+      keyword: doneFilters.keyword.trim() || undefined,
+      page: donePage.value - 1,
+      size: doneSize.value
+    })
+    doneRows.value = r.content || []
+    doneTotal.value = r.totalElements || 0
+  } finally {
+    doneLoading.value = false
+  }
+}
+
+function switchView(v) {
+  viewMode.value = v
+  if (v === 'done') loadDone(1)
+}
+
+// 业务类型筛选对已办结同样生效：切换类型时重新拉取
+watch(filter, () => { if (viewMode.value === 'done') loadDone(1) })
+
 async function load() {
   loading.value = true
   try {
@@ -169,6 +276,10 @@ async function load() {
 }
 
 function openReview(row,result){selected.value=row;approved.value=result;opinion.value='';reviewVisible.value=true}
+
+// 已办结记录双击查看详情（只读）
+const doneVisible = ref(false), doneSelected = ref(null)
+function showDoneDetail(row){doneSelected.value=row;doneVisible.value=true}
 async function submitReview(){if(!approved.value&&!opinion.value.trim())return ElMessage.warning('请填写驳回原因');submitting.value=true;try{const result=await approvalApi.review(selected.value,approved.value,opinion.value.trim());reviewVisible.value=false;ElMessage.success(!approved.value?'申请已驳回':result.completed?'审批完成，业务已执行':`当前节点通过，已流转至：${result.nextNode}`);await load()}finally{submitting.value=false}}
 
 function formatTime(value) {
@@ -277,6 +388,19 @@ onMounted(load)
   border: 0;
   box-shadow: 0 2px 10px rgba(30, 60, 120, .05);
 }
+// ---------- 已办结视图 ----------
+.toolbar-right { display: flex; align-items: center; gap: 10px; }
+.round-no { color: #8492a6; font-size: 12px; }
+.done-dim { color: #b0b8c4; }
+.done-pager { display: flex; justify-content: flex-end; margin-top: 12px; }
+.done-opinion { margin: 0 12px 10px; padding: 8px 10px; background: #f7fafc; border: 1px solid #e8eef5; border-radius: 8px; font-size: 12px; color: #5a6b85; line-height: 1.6; word-break: break-all; }
+.done-detail { display: grid; grid-template-columns: 1fr 1fr; gap: 0; margin: 0; }
+.done-detail > div { display: flex; gap: 10px; padding: 9px 4px; border-bottom: 1px dashed #eef2f7; align-items: baseline; }
+.done-detail dt { color: #8492a6; flex-shrink: 0; font-size: 12px; width: 72px; }
+.done-detail dd { margin: 0; color: #263750; font-size: 13px; word-break: break-all; }
+.done-detail .reason-row { grid-column: 1 / -1; }
+.m-pager { display: flex; justify-content: center; padding: 12px 0 4px; }
+@media(max-width:767px){.done-detail{grid-template-columns:1fr}}
 @media(max-width:1100px){.approval-overview{grid-template-columns:repeat(3,1fr)}}
 @media(max-width:767px){.approval-overview{display:flex;overflow-x:auto;padding-bottom:5px}.metric-card{min-width:135px;padding:12px}.metric-icon{width:36px;height:36px}.metric-card strong{font-size:18px}.task-toolbar{padding:10px;gap:10px}.task-toolbar>div{display:block}.task-toolbar span{display:block;margin-top:3px}.review-sheet dl{grid-template-columns:1fr}.review-sheet dl div,.review-sheet dl div:nth-child(odd){border-right:0;border-bottom:1px solid #edf1f5}.review-sheet dl div:last-child{border-bottom:0}}
 </style>
