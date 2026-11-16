@@ -18,6 +18,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.util.List;
+
 @Service
 public class ProductService {
     private final ProductRepository productRepo;
@@ -60,14 +62,46 @@ public class ProductService {
     public ProductDTO create(ProductDTO dto) {
         if (!StringUtils.hasText(dto.sku())) throw new BizException("sku不能为空");
         if (!StringUtils.hasText(dto.name())) throw new BizException("name不能为空");
-        if (productRepo.existsBySku(dto.sku())) throw new BizException("sku已存在");
-        Product p = new Product(dto.sku(), dto.name(), dto.spec(), dto.unit());
+        String skuInput = dto.sku().trim();
+        // 人工只填两段前缀（如 SC-04）时流水号系统生成；填完整编码（尾段 3 位以上数字）则沿用原逻辑
+        if (!skuInput.matches(".*-\\d{3,}")) {
+            skuInput = generateSku(normalizePrefix(skuInput));
+        }
+        if (productRepo.existsBySku(skuInput)) throw new BizException("sku已存在");
+        Product p = new Product(skuInput, dto.name(), dto.spec(), dto.unit());
         // 新建时默认 0（跟随系统配置）；需要单独设的备件在表单里填具体天数
         applyFields(p, dto);
         productRepo.save(p);
         auditService.record("PRODUCT", p.getId(), p.getSku(), "CREATE", null, null,
                 "新增备件：" + p.getName() + "；规格：" + (p.getSpec() == null ? "-" : p.getSpec()));
         return toDTO(p);
+    }
+
+    /** 编码前缀 → 下一个可用完整编码（新增货品实时预览用） */
+    public String nextSku(String prefix) {
+        return generateSku(normalizePrefix(prefix));
+    }
+
+    private String normalizePrefix(String prefix) {
+        String p = prefix == null ? "" : prefix.trim().toUpperCase();
+        if (!p.matches("[A-Z0-9]{2,3}-\\d{2}")) {
+            throw new BizException("编码前缀格式不正确，应为两段式，如 SC-04");
+        }
+        return p;
+    }
+
+    /** 同前缀下取已有最大流水号 +1，不足三位补零（超过 999 自然进位） */
+    private String generateSku(String prefix) {
+        List<String> skus = productRepo.findSkusStartingWith(prefix + "-");
+        int max = 0;
+        for (String sku : skus) {
+            String tail = sku.substring(sku.lastIndexOf('-') + 1);
+            if (tail.matches("\\d+")) {
+                int v = Integer.parseInt(tail);
+                if (v > max) max = v;
+            }
+        }
+        return prefix + "-" + String.format("%03d", max + 1);
     }
 
     @Transactional

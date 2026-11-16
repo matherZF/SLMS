@@ -4,7 +4,10 @@
       <el-tabs v-model="activeTab">
         <el-tab-pane label="基本信息" name="basic">
           <div class="form-grid">
-            <el-form-item label="SKU编码" prop="sku"><el-input v-model="form.sku" :disabled="isEdit" maxlength="64" placeholder="如 SP-001" /></el-form-item>
+            <el-form-item label="SKU编码" prop="sku">
+              <el-input v-model="form.sku" :disabled="isEdit" maxlength="64" :placeholder="isEdit?'':'两段式前缀，如 SC-04，流水号自动生成'" />
+              <div v-if="nextCode" class="sku-hint">完整编码：<b>{{ nextCode }}</b></div>
+            </el-form-item>
             <el-form-item label="备件名称" prop="name"><el-input v-model="form.name" maxlength="128" /></el-form-item>
             <el-form-item label="备件分类"><el-select v-model="form.category" filterable clearable style="width:100%"><el-option v-for="x in categoryOptions" :key="x.id" :label="x.itemLabel" :value="x.itemLabel"/></el-select></el-form-item>
             <el-form-item label="计量单位"><el-select v-model="form.unit" filterable clearable style="width:100%"><el-option v-for="x in unitOptions" :key="x.id" :label="x.itemLabel" :value="x.itemLabel"/></el-select></el-form-item>
@@ -80,7 +83,17 @@ const metricOptions=i=>{const used=form.lifeMetricRules.filter((r,j)=>j!==i&&r.m
 const lifeEnabled=computed(()=>form.lifeMetricRules.some(r=>r.metric&&r.metric!=='NONE'))
 function addRule(){const next=metricOptions(form.lifeMetricRules.length)[0];if(next)form.lifeMetricRules.push({metric:next.value,rated:null})}
 function onMetricChange(i){if(form.lifeMetricRules[i].metric==='NONE')form.lifeMetricRules.splice(i+1)}
-const rules={sku:[{required:true,message:'请输入SKU编码',trigger:'blur'}],name:[{required:true,message:'请输入备件名称',trigger:'blur'}],maxStock:[{validator:(_r,v,done)=>{if(v!=null&&(v<form.minStock||v<form.safetyStock))done(new Error('最高库存不能小于最低库存或安全库存'));else done()},trigger:'change'}]}
+const rules={sku:[{required:true,message:'请输入SKU编码',trigger:'blur'},{validator:(_r,v,done)=>{if(isEdit.value)return done();const s=(v||'').trim();if(/^[A-Za-z0-9]{2,3}-\d{2}$/.test(s)||/^[A-Za-z0-9-]+-\d{3,}$/.test(s))done();else done(new Error('请输入两段式前缀（如 SC-04），流水号自动生成'))},trigger:'blur'}],name:[{required:true,message:'请输入备件名称',trigger:'blur'}],maxStock:[{validator:(_r,v,done)=>{if(v!=null&&(v<form.minStock||v<form.safetyStock))done(new Error('最高库存不能小于最低库存或安全库存'));else done()},trigger:'change'}]}
+/** 新增时按前缀实时预览流水号（防抖 300ms，编辑态不预览） */
+const nextCode=ref('')
+let skuTimer=null
+watch(()=>form.sku,v=>{
+  clearTimeout(skuTimer)
+  if(isEdit.value){nextCode.value='';return}
+  const s=(v||'').trim()
+  if(!/^[A-Za-z0-9]{2,3}-\d{2}$/.test(s)){nextCode.value='';return}
+  skuTimer=setTimeout(async()=>{try{nextCode.value=await api.nextSku(s)}catch{nextCode.value=''}},300)
+})
 /** 行数据 → 规则列表：优先用新字段，老数据按单口径折算 */
 function normalizeRules(row){
   const list=Array.isArray(row?.lifeMetricRules)?row.lifeMetricRules:[]
@@ -116,6 +129,7 @@ async function submit(){
 
 <style scoped lang="scss">
 .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:2px 18px}.full{grid-column:1/-1}.suffix{margin-left:8px;color:#909399}
+.sku-hint{width:100%;margin-top:4px;font-size:12px;color:#0ea5e9;font-weight:400}
 .life-rules{display:flex;flex-direction:column;gap:8px;width:100%}
 .life-rule{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .life-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap}

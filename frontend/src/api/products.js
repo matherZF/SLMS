@@ -21,6 +21,11 @@ export function update(id, payload) {
   return request.put(`/products/${id}`, payload)
 }
 
+// 编码前缀 → 下一个可用完整编码（人工只填前两段，流水号自动生成）
+export function nextSku(prefix) {
+  return request.get('/products/next-sku', { params: { prefix } })
+}
+
 // 删除
 export function remove(id) {
   return request.delete(`/products/${id}`)

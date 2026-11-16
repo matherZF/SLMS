@@ -103,6 +103,20 @@
         </div>
       </el-header>
 
+      <!-- 页签栏：记录已打开的页面，点击切换、可关闭 -->
+      <div class="tags-bar">
+        <div
+          v-for="v in views"
+          :key="v.path"
+          class="tag-item"
+          :class="{ active: v.path === route.fullPath }"
+          @click="goView(v)"
+        >
+          {{ v.title }}
+          <el-icon v-if="!v.affix" class="tag-close" @click.stop="closeView(v)"><Close /></el-icon>
+        </div>
+      </div>
+
       <!-- 个人信息弹框（编辑自己的姓名 / 修改自己的密码） -->
       <el-dialog v-model="profileVisible" title="个人信息" width="480px" :close-on-click-modal="false">
         <el-form label-width="90px">
@@ -141,7 +155,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import authApi from '@/api/auth'
@@ -202,6 +216,31 @@ async function saveProfile() {
     ElMessage.success('个人信息已保存')
   } finally {
     savingProfile.value = false
+  }
+}
+
+// ---------- 页签导航：登记已打开的页面 ----------
+const views = ref([])
+function addView(r) {
+  if (!r.meta?.title) return
+  if (!views.value.some(v => v.path === r.fullPath)) {
+    views.value.push({ path: r.fullPath, title: r.meta.title, affix: r.path === '/workbench' })
+  }
+}
+watch(() => route.fullPath, () => addView(route), { immediate: true })
+
+function goView(v) {
+  if (v.path !== route.fullPath) router.push(v.path)
+}
+
+function closeView(v) {
+  const i = views.value.findIndex(x => x.path === v.path)
+  if (i < 0) return
+  views.value.splice(i, 1)
+  // 关闭的是当前页：跳到相邻页签，没有则回工作台
+  if (v.path === route.fullPath) {
+    const next = views.value[i - 1] || views.value[i] || views.value[0]
+    router.push(next ? next.path : '/workbench')
   }
 }
 
@@ -299,9 +338,53 @@ function handleCommand(cmd) {
     font-weight: 500;
   }
 }
+.tags-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 24px;
+  background: rgba(255,255,255,.92);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(148,163,184,.18);
+  overflow-x: auto;
+  flex-shrink: 0;
+  &::-webkit-scrollbar { height: 4px; }
+  &::-webkit-scrollbar-thumb { background: rgba(148,163,184,.35); border-radius: 2px; }
+}
+.tag-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(148,163,184,.35);
+  background: #fff;
+  color: #475569;
+  font-size: 12px;
+  line-height: 18px;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+  transition: all .15s;
+  &:hover { color: #0ea5e9; border-color: rgba(14,165,233,.55); }
+  &.active {
+    background: #0ea5e9;
+    border-color: #0ea5e9;
+    color: #fff;
+    font-weight: 500;
+  }
+}
+.tag-close {
+  font-size: 12px;
+  border-radius: 50%;
+  padding: 1px;
+  &:hover { background: #e2e8f0; color: #334155; }
+}
+.tag-item.active .tag-close:hover { background: rgba(255,255,255,.35); color: #fff; }
 .main {
   background: radial-gradient(circle at 85% 0,rgba(14,165,233,.08),transparent 28%),#f4f7fb;
-  min-height: calc(100vh - 60px);
+  flex: 1;
+  min-height: 0;
   padding: 20px;
   overflow-y: auto;
 }

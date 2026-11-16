@@ -46,6 +46,7 @@ backend/logs/
 backend/BOOT-INF/
 
 # docs 临时/验收/测试产物
+docs/
 docs/.qa-final/
 docs/.qa-final-all/
 docs/build_revised_docs.py

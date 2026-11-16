@@ -36,6 +36,12 @@ public class ProductController {
         return Result.ok(productService.getById(id));
     }
 
+    /** 编码前缀 → 下一个可用完整编码：新增货品人工只填前两段，流水号系统生成 */
+    @GetMapping("/next-sku")
+    public Result<String> nextSku(@RequestParam String prefix) {
+        return Result.ok(productService.nextSku(prefix));
+    }
+
     @PostMapping
     @PreAuthorize("hasAuthority('master:edit')")
     public Result<ProductDTO> create(@Valid @RequestBody ProductDTO dto) {
