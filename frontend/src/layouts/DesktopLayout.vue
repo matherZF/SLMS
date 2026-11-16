@@ -103,10 +103,10 @@
         </div>
       </el-header>
 
-      <!-- 页签栏：记录已打开的页面，点击切换、可关闭 -->
+      <!-- 页签栏：记录已打开的页面，点击切换、可关闭（配合 KeepAlive 保留页面状态） -->
       <div class="tags-bar">
         <div
-          v-for="v in views"
+          v-for="v in tagsStore.views"
           :key="v.path"
           class="tag-item"
           :class="{ active: v.path === route.fullPath }"
@@ -160,6 +160,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import authApi from '@/api/auth'
 import { useAuthStore } from '@/stores/auth'
+import { useTagsViewStore } from '@/stores/tagsView'
 import * as alertApi from '@/api/alerts'
 
 const route = useRoute()
@@ -219,27 +220,18 @@ async function saveProfile() {
   }
 }
 
-// ---------- 页签导航：登记已打开的页面 ----------
-const views = ref([])
-function addView(r) {
-  if (!r.meta?.title) return
-  if (!views.value.some(v => v.path === r.fullPath)) {
-    views.value.push({ path: r.fullPath, title: r.meta.title, affix: r.path === '/workbench' })
-  }
-}
-watch(() => route.fullPath, () => addView(route), { immediate: true })
+// ---------- 页签导航：登记已打开的页面（缓存名单在 tagsView store，供 App.vue 的 KeepAlive 使用） ----------
+const tagsStore = useTagsViewStore()
+watch(() => route.fullPath, () => tagsStore.addView(route), { immediate: true })
 
 function goView(v) {
   if (v.path !== route.fullPath) router.push(v.path)
 }
 
 function closeView(v) {
-  const i = views.value.findIndex(x => x.path === v.path)
-  if (i < 0) return
-  views.value.splice(i, 1)
+  const next = tagsStore.removeView(v)
   // 关闭的是当前页：跳到相邻页签，没有则回工作台
   if (v.path === route.fullPath) {
-    const next = views.value[i - 1] || views.value[i] || views.value[0]
     router.push(next ? next.path : '/workbench')
   }
 }
