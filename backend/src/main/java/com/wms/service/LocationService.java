@@ -37,12 +37,9 @@ public class LocationService {
 
     public Page<LocationDTO> page(String code, String area, int page, int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by("id").descending());
-        String c = StringUtils.hasText(code) ? code : "";
-        String a = StringUtils.hasText(area) ? area : "";
-        if (!c.isEmpty() || !a.isEmpty()) {
-            return locationRepo.findByCodeContainingOrAreaContaining(c, a, pageable).map(this::toDTO);
-        }
-        return locationRepo.findAll(pageable).map(this::toDTO);
+        String c = StringUtils.hasText(code) ? code.trim() : "";
+        String a = StringUtils.hasText(area) ? area.trim() : "";
+        return locationRepo.searchByCodeAndArea(c, a, pageable).map(this::toDTO);
     }
 
     public LocationDTO getById(Long id) {

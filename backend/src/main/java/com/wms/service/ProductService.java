@@ -45,12 +45,9 @@ public class ProductService {
 
     public Page<ProductDTO> page(String sku, String name, int page, int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by("id").descending());
-        String s = StringUtils.hasText(sku) ? sku : "";
-        String n = StringUtils.hasText(name) ? name : "";
-        if (!s.isEmpty() || !n.isEmpty()) {
-            return productRepo.findBySkuContainingOrNameContaining(s, n, pageable).map(this::toDTO);
-        }
-        return productRepo.findAll(pageable).map(this::toDTO);
+        String s = StringUtils.hasText(sku) ? sku.trim() : "";
+        String n = StringUtils.hasText(name) ? name.trim() : "";
+        return productRepo.searchBySkuAndName(s, n, pageable).map(this::toDTO);
     }
 
     public ProductDTO getById(Long id) {

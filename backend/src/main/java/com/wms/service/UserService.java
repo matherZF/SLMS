@@ -46,16 +46,10 @@ public class UserService {
 
     public Page<UserDTO> page(String username, String displayName, int page, int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by("id").ascending());
-        boolean hasU = StringUtils.hasText(username);
-        boolean hasD = StringUtils.hasText(displayName);
-        // 原来两个条件一起拼进 OR 查询，只填一个时另一个是空串 → LIKE '%%' 命中全部，
-        // 表现就是"按用户名搜索"把所有人都捞出来了。这里按实际填写的条件分开查。
-        if (hasU && hasD) {
-            return userRepo.findByUsernameContainingOrDisplayNameContaining(username, displayName, pageable).map(this::toDTO);
-        }
-        if (hasU) return userRepo.findByUsernameContaining(username, pageable).map(this::toDTO);
-        if (hasD) return userRepo.findByDisplayNameContaining(displayName, pageable).map(this::toDTO);
-        return userRepo.findAll(pageable).map(this::toDTO);
+        String u = StringUtils.hasText(username) ? username.trim() : "";
+        String d = StringUtils.hasText(displayName) ? displayName.trim() : "";
+        // 查询语义：非空条件 AND 组合，空条件不过滤（此前 OR 派生查询只填一个条件时会命中全部）
+        return userRepo.searchByUsernameAndDisplayName(u, d, pageable).map(this::toDTO);
     }
 
     public UserDTO getById(Long id) {
