@@ -31,6 +31,11 @@ export function remove(id) {
   return request.delete(`/products/${id}`)
 }
 
+// 已关联设备数（关联设备弹框顶部展示）
+export function boundEquipmentCount(id) {
+  return request.get(`/products/${id}/equipments`)
+}
+
 // 批量关联设备：一个备件一次绑到多台设备（数据初始化场景）
 export function bindEquipments(id, payload) {
   return request.post(`/products/${id}/equipments`, payload)

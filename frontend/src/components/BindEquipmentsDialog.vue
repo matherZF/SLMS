@@ -10,6 +10,7 @@
     <div v-if="product" class="be-product-line">
       <span class="be-sku">{{ product.sku }}</span>
       <span v-if="product.spec" class="be-dim"> · {{ product.spec }}</span>
+      <span class="be-bound">已关联设备数：<b>{{ boundCount }}</b></span>
     </div>
 
     <!-- 筛选 -->
@@ -85,6 +86,7 @@ const emit = defineEmits(['update:modelValue', 'success'])
 
 const loading = ref(false), submitting = ref(false)
 const devices = ref([]), zoneOptions = ref([])
+const boundCount = ref(0)
 const keyword = ref(''), zone = ref('')
 const tableRef = ref(null)
 const selectedIds = ref(new Set())
@@ -110,6 +112,7 @@ async function onOpen() {
   try {
     if (!zoneOptions.value.length) zoneOptions.value = await dictApi.options('EQUIPMENT_ZONE')
     devices.value = await equipmentApi.list()
+    boundCount.value = await productsApi.boundEquipmentCount(props.product.id)
   } finally {
     loading.value = false
   }
@@ -182,6 +185,7 @@ async function submit() {
     ElMessage.success(`关联完成：新增 ${r.created} 台，更新 ${r.updated} 台`)
     emit('update:modelValue', false)
     emit('success')
+    boundCount.value = await productsApi.boundEquipmentCount(props.product.id)
   } finally {
     submitting.value = false
   }
@@ -191,6 +195,8 @@ async function submit() {
 <style scoped>
 .be-product-line { margin-bottom: 10px; font-size: 14px; font-weight: 600; color: #1f2d3d; }
 .be-sku { color: #2e6cf6; font-family: Consolas, monospace; }
+.be-bound { margin-left: 14px; font-size: 13px; font-weight: 400; color: #475467; }
+.be-bound b { color: #2e6cf6; margin-left: 2px; }
 .be-dim { color: #98a2b3; font-size: 12px; }
 .be-filter { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
 .be-paste-wrap { margin: 10px 0; }

@@ -11,4 +11,5 @@ public interface EquipmentPartRepository extends JpaRepository<EquipmentPart,Lon
   */
  @EntityGraph(attributePaths={"equipment","product"}) List<EquipmentPart> findByProductId(Long productId);
  Optional<EquipmentPart> findByEquipmentIdAndProductId(Long equipmentId,Long productId);
+ long countByProductId(Long productId);
 }

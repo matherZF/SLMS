@@ -56,6 +56,8 @@ import com.wms.common.BizException; import com.wms.entity.*; import com.wms.repo
   }
   return new ArrayList<>(out.values());
  }
+ /** 货品已关联设备数（关联设备弹框顶部展示用） */
+ public long boundEquipmentCount(Long productId){ return partRepo.countByProductId(productId); }
  /** 批量关联：一个备件一次绑到多台设备（数据初始化场景，如同一备件装在 40 台设备上）。已有关联的设备按本次参数覆盖更新。 */
  @Transactional public Map<String,Object> bindPartBulk(Long productId,Map<String,Object> req){
   Product p=productRepo.findById(productId).orElseThrow(()->new BizException("备件不存在"));

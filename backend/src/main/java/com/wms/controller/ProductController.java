@@ -61,6 +61,12 @@ public class ProductController {
         return Result.ok();
     }
 
+    /** 已关联设备数：关联设备弹框顶部展示 */
+    @GetMapping("/{id}/equipments")
+    public Result<Long> boundEquipmentCount(@PathVariable Long id) {
+        return Result.ok(equipmentService.boundEquipmentCount(id));
+    }
+
     /** 批量关联设备：一个备件一次绑到多台设备（数据初始化场景）。 */
     @PostMapping("/{id}/equipments")
     @PreAuthorize("hasAuthority('master:edit')")
